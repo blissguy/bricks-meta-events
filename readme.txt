@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.8.1 =
+* While test mode is on, tracking now reports what it is doing in the browser console. A click leaves no record on the server, so this is the only way to tell a button that fired from one that quietly did not.
+* It also says why nothing was sent, the usual reason being that you are signed in as staff, which Meta pixel for WordPress ignores. Clicks already counted during the same visit are reported too.
 
 = 0.8.0 =
 * Buttons and text links now have their own Meta tracking panel, so you choose exactly which ones count. Works on a link styled as a button and on a real button, including one with no link at all such as a popup trigger.

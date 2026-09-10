@@ -127,6 +127,11 @@ class Plugin {
 				array(
 					'enabled'      => ! Host_Adapter::is_internal_user() && ! Settings::current_user_excluded(),
 					'trackLinks'   => Settings::track_links(),
+					// While setting up, say out loud what is and is not being
+					// sent. Clicks leave no server record, so without this
+					// there is no way to tell a working button from a dead one.
+					'debug'        => '' !== Form_Tracker::test_event_code(),
+					'staff'        => Host_Adapter::is_internal_user(),
 					'contactEvent' => 'Contact',
 					'standard'     => Event_Map::standard_events(),
 				)

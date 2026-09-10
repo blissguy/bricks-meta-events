@@ -29,6 +29,24 @@
 	var SEEN_KEY = 'bmeSeenLinks';
 
 	/**
+	 * Say what happened, while test mode is on.
+	 *
+	 * A click leaves no record anywhere on the server, so during setup this is
+	 * the only way to tell a button that fired from one that quietly did not.
+	 */
+	function note( message, detail ) {
+		if ( ! config.debug || ! window.console ) {
+			return;
+		}
+
+		if ( detail ) {
+			window.console.info( '[Meta tracking] ' + message, detail );
+		} else {
+			window.console.info( '[Meta tracking] ' + message );
+		}
+	}
+
+	/**
 	 * The Meta plugin's own sender, never fbq directly.
 	 *
 	 * It holds events while consent is revoked, queues those fired before the
@@ -43,6 +61,8 @@
 		}
 
 		signal.trackEvent( name, params || {}, null, method || 'track', eventId );
+
+		note( 'sent ' + name, { method: method || 'track', eventId: eventId, details: params || {} } );
 
 		return true;
 	}
@@ -87,6 +107,8 @@
 	 */
 	window.bmeTrack = function ( name, params ) {
 		if ( ! config.enabled ) {
+			note( blockedReason( name ) );
+
 			return false;
 		}
 
@@ -130,6 +152,17 @@
 	 * to be a phone link, the sweep below must not fire a second event for the
 	 * same click.
 	 */
+	/**
+	 * Why nothing was sent, in words the reader can act on.
+	 */
+	function blockedReason( name ) {
+		if ( config.staff ) {
+			return 'did not send ' + name + ' because you are signed in as staff. Meta pixel for WordPress ignores anyone who can edit posts or upload files. Try again in a private window.';
+		}
+
+		return 'did not send ' + name + ' because tracking is switched off for this visitor.';
+	}
+
 	function onClick( event ) {
 		var target = event.target;
 
@@ -159,7 +192,19 @@
 			return;
 		}
 
-		if ( ! payload || ! payload.name || alreadyCounted( 'el:' + ( payload.id || payload.name ) ) ) {
+		if ( ! payload || ! payload.name ) {
+			return;
+		}
+
+		if ( ! config.enabled ) {
+			note( blockedReason( payload.name ) );
+
+			return;
+		}
+
+		if ( alreadyCounted( 'el:' + ( payload.id || payload.name ) ) ) {
+			note( 'skipped ' + payload.name + ' because this one has already been counted during this visit. Open a new private window to count it again.' );
+
 			return;
 		}
 
@@ -181,7 +226,13 @@
 
 		var href = link.getAttribute( 'href' ) || '';
 
-		if ( ! href || alreadyCounted( href ) ) {
+		if ( ! href ) {
+			return;
+		}
+
+		if ( alreadyCounted( href ) ) {
+			note( 'skipped this link because it has already been counted during this visit.' );
+
 			return;
 		}
 
@@ -190,7 +241,9 @@
 		} );
 	}
 
-	if ( config.enabled ) {
+	// Attached while debugging even when this visitor is not tracked, so the
+	// console can explain the silence rather than leaving someone guessing.
+	if ( config.enabled || config.debug ) {
 		// Capture phase and delegated from the document, so it still fires
 		// when something else stops the event or replaces the markup.
 		document.addEventListener( 'click', onClick, true );

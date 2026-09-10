@@ -76,6 +76,7 @@ It works on a Bricks **button with no link at all** — one that opens a popup, 
 
 Settings are resolved on the server and travel on the element in a `data-bme` attribute, read by one delegated listener rather than a script per element. That keeps it working inside popups, query loops and anything rendered later.
 
+- **Checking one works.** A click leaves no server record, so turn on test mode and open the browser console: every send is logged, and so is every reason one did not happen, including being signed in as staff or having already counted that element this visit.
 - **Counted once per element per visit.** Someone tapping a phone number twice is one intention.
 - **An element you configured beats the phone and email sweep**, so a tracked `tel:` link fires once, not twice.
 - **The label is resolved server-side.** Text containing unresolved dynamic data is skipped, because a button reading `Download {post_title}` would otherwise become a separate entry for every post. Where no label resolves, the visible text is used at click time.

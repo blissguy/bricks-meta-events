@@ -433,7 +433,7 @@ class Health_Screen {
 		$code = Form_Tracker::test_event_code();
 
 		echo '<h2>' . esc_html__( 'Test mode', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'While a code is saved here, conversions from your forms go to Events Manager, Test Events instead of your real figures. Copy the code from the Test Events tab, and empty this box when you have finished checking.', 'bricks-meta-events' ) . '</p>';
+		echo '<p>' . esc_html__( 'While a code is saved here, conversions from your forms go to Events Manager, Test Events instead of your real figures. Tracking also reports what it is doing in your browser console, which is the only way to check a button or a link, because a click leaves no record on the server. Copy the code from the Test Events tab, and empty this box when you have finished checking.', 'bricks-meta-events' ) . '</p>';
 
 		if ( '' !== $code ) {
 			printf(
