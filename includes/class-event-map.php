@@ -18,8 +18,9 @@ defined( 'ABSPATH' ) || exit;
  */
 class Event_Map {
 
-	public const DEFAULT_INTENT = 'lead';
-	public const CUSTOM_INTENT  = 'custom';
+	public const DEFAULT_INTENT       = 'lead';
+	public const DEFAULT_CLICK_INTENT = 'contact';
+	public const CUSTOM_INTENT        = 'custom';
 
 	/**
 	 * Intent key => Meta standard event name.
@@ -77,6 +78,57 @@ class Event_Map {
 		}
 
 		return self::events()[ $intent ] ?? self::events()[ self::DEFAULT_INTENT ];
+	}
+
+	/**
+	 * Intent key => Meta event, for things people click.
+	 *
+	 * A shorter list than forms, because most of the form outcomes cannot
+	 * honestly follow from a click. Nobody creates an account by clicking a
+	 * button, so offering CompleteRegistration here would invite a claim the
+	 * click cannot support.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function click_events(): array {
+		return array(
+			'contact'           => 'Contact',
+			'lead'              => 'Lead',
+			'schedule'          => 'Schedule',
+			'viewContent'       => 'ViewContent',
+			'submitApplication' => 'SubmitApplication',
+		);
+	}
+
+	/**
+	 * Click intents, phrased for the builder.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function click_options(): array {
+		return array(
+			'contact'           => __( 'They get in touch (Contact)', 'bricks-meta-events' ),
+			'lead'              => __( 'They become a lead (Lead)', 'bricks-meta-events' ),
+			'schedule'          => __( 'They book or arrange something (Schedule)', 'bricks-meta-events' ),
+			'viewContent'       => __( 'They open something worth knowing about (ViewContent)', 'bricks-meta-events' ),
+			'submitApplication' => __( 'They start an application (SubmitApplication)', 'bricks-meta-events' ),
+			self::CUSTOM_INTENT => __( 'Something else', 'bricks-meta-events' ),
+		);
+	}
+
+	/**
+	 * Resolve a clickable element's settings to an event name.
+	 *
+	 * @param array $settings Bricks element settings.
+	 */
+	public static function resolve_click( array $settings ): string {
+		$intent = $settings['bmeIntent'] ?? self::DEFAULT_CLICK_INTENT;
+
+		if ( self::CUSTOM_INTENT === $intent ) {
+			return trim( (string) ( $settings['bmeCustomName'] ?? '' ) );
+		}
+
+		return self::click_events()[ $intent ] ?? self::click_events()[ self::DEFAULT_CLICK_INTENT ];
 	}
 
 	/**

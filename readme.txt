@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.7.0
+Stable tag: 0.8.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,12 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.8.0 =
+* Buttons and text links now have their own Meta tracking panel, so you choose exactly which ones count. Works on a link styled as a button and on a real button, including one with no link at all such as a popup trigger.
+* A button or link you have set up yourself takes priority over the phone and email sweep, so a tracked phone link is counted once rather than twice.
+* Clicks are counted once per button per visit.
+* Updates now appear on the Plugins screen and install like any other plugin, instead of uploading a ZIP by hand.
 
 = 0.7.0 =
 * Added window.bmeTrack, for recording something the plugin cannot see for itself. It can be called straight from a Bricks Interaction with no code, using trigger click and action JavaScript (Function).

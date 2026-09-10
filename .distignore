@@ -1,24 +1,30 @@
 # Files and directories that must not ship in the release ZIP.
+#
+# Paths starting with "/" are anchored to the plugin root. That matters:
+# rsync matches an unanchored name at any depth, so a bare "vendor" would
+# also strip lib/plugin-update-checker/vendor, which the updater needs at
+# runtime to render the update details.
+/.github
+/.distignore
+/package.json
+/package-lock.json
+/composer.json
+/composer.lock
+/phpcs.xml
+/phpcs.xml.dist
+/phpunit.xml
+/phpunit.xml.dist
+/tests
+/docs
+/build
+/vendor
+# Internal notes. readme.txt is what the plugin screen reads.
+/README.md
 .git
-.github
 .gitignore
-.distignore
 .DS_Store
 .idea
 .vscode
 node_modules
-package.json
-package-lock.json
-composer.json
-composer.lock
-phpcs.xml
-phpcs.xml.dist
-phpunit.xml
-phpunit.xml.dist
-tests
-# Internal notes. readme.txt is what the plugin screen reads.
-README.md
-docs
-build
 *.zip
 *.log

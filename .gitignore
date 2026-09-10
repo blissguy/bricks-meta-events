@@ -1,7 +1,11 @@
+# Anchored to the plugin root on purpose. An unanchored "vendor/" also matches
+# lib/plugin-update-checker/vendor, which the updater needs at runtime, so the
+# library would be committed incomplete and every release ZIP would ship a
+# broken updater.
+/vendor/
+/node_modules/
 .DS_Store
 Thumbs.db
 *.log
-node_modules/
-vendor/
 .idea/
 .vscode/

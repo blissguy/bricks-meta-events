@@ -28,11 +28,124 @@ class Element_Controls {
 	private const GROUP = 'bmeTracking';
 
 	/**
+	 * Elements whose clicks can be tracked.
+	 *
+	 * Both are needed rather than just links: a link styled as a button and a
+	 * real button look identical to a visitor, and a Bricks button with no
+	 * link renders as a button element, so neither can be inferred from the
+	 * other.
+	 */
+	public const CLICK_ELEMENTS = array( 'button', 'text-link' );
+
+	/**
 	 * Register hooks.
 	 */
 	public static function register(): void {
 		add_filter( 'bricks/elements/form/control_groups', array( self::class, 'add_group' ) );
 		add_filter( 'bricks/elements/form/controls', array( self::class, 'add_controls' ) );
+
+		foreach ( self::CLICK_ELEMENTS as $element ) {
+			add_filter( "bricks/elements/{$element}/control_groups", array( self::class, 'add_group' ) );
+			add_filter( "bricks/elements/{$element}/controls", array( self::class, 'add_click_controls' ) );
+		}
+	}
+
+	/**
+	 * Add the controls for a clickable element.
+	 *
+	 * Deliberately a shorter panel than a form's. There is no customer to
+	 * match on a click and nothing for the server to verify, so the settings
+	 * that only make sense with a submission are not offered.
+	 *
+	 * @param array $controls Existing controls.
+	 *
+	 * @return array
+	 */
+	public static function add_click_controls( $controls ) {
+		if ( ! is_array( $controls ) ) {
+			return $controls;
+		}
+
+		$enabled = array( 'bmeEnabled', '=', true );
+
+		$controls['bmeSiteStatus'] = array(
+			'tab'     => 'content',
+			'group'   => self::GROUP,
+			'type'    => 'info',
+			'content' => self::site_status(),
+		);
+
+		$controls['bmeEnabled'] = array(
+			'tab'   => 'content',
+			'group' => self::GROUP,
+			'label' => esc_html__( 'Track clicks on this', 'bricks-meta-events' ),
+			'type'  => 'checkbox',
+		);
+
+		$controls['bmeClickInfo'] = array(
+			'tab'      => 'content',
+			'group'    => self::GROUP,
+			'type'     => 'info',
+			'content'  => esc_html__( 'A click is not a confirmed enquiry the way a sent form is. Nothing checks that anything came of it, and no customer details go with it, so use this for things like a phone number or a booking link rather than in place of a form.', 'bricks-meta-events' ),
+			'required' => $enabled,
+		);
+
+		$controls['bmeIntent'] = array(
+			'tab'         => 'content',
+			'group'       => self::GROUP,
+			'label'       => esc_html__( 'What does clicking this mean?', 'bricks-meta-events' ),
+			'type'        => 'select',
+			'options'     => Event_Map::click_options(),
+			'default'     => Event_Map::DEFAULT_CLICK_INTENT,
+			'clearable'   => false,
+			'description' => esc_html__( 'The name in brackets is what you will see in Meta Events Manager.', 'bricks-meta-events' ),
+			'required'    => $enabled,
+		);
+
+		$controls['bmeCustomName'] = array(
+			'tab'            => 'content',
+			'group'          => self::GROUP,
+			'label'          => esc_html__( 'Your event name', 'bricks-meta-events' ),
+			'type'           => 'text',
+			'hasDynamicData' => false,
+			'placeholder'    => 'BrochureOpened',
+			'info'           => esc_html__( 'Meta cannot use your own names for most ad goals until they build up plenty of activity. Pick one of the standard options above unless you are sure.', 'bricks-meta-events' ),
+			'required'       => array( $enabled, array( 'bmeIntent', '=', Event_Map::CUSTOM_INTENT ) ),
+		);
+
+		$controls['bmeLabel'] = array(
+			'tab'            => 'content',
+			'group'          => self::GROUP,
+			'label'          => esc_html__( 'Name in Events Manager', 'bricks-meta-events' ),
+			'type'           => 'text',
+			'hasDynamicData' => false,
+			'placeholder'    => esc_html__( 'Auto', 'bricks-meta-events' ),
+			'description'    => esc_html__( 'Left on Auto, the text on the button or link is used.', 'bricks-meta-events' ),
+			'required'       => $enabled,
+		);
+
+		$controls['bmeValue'] = array(
+			'tab'            => 'content',
+			'group'          => self::GROUP,
+			'label'          => esc_html__( 'What one of these is worth', 'bricks-meta-events' ),
+			'type'           => 'number',
+			'min'            => 0,
+			'hasDynamicData' => false,
+			'description'    => esc_html__( 'Leave it blank if you do not know, because a wrong figure is worse than none.', 'bricks-meta-events' ),
+			'required'       => $enabled,
+		);
+
+		$controls['bmeCurrency'] = array(
+			'tab'            => 'content',
+			'group'          => self::GROUP,
+			'label'          => esc_html__( 'Currency', 'bricks-meta-events' ),
+			'type'           => 'text',
+			'hasDynamicData' => false,
+			'placeholder'    => Settings::default_currency(),
+			'required'       => array( $enabled, array( 'bmeValue', '!=', '' ) ),
+		);
+
+		return $controls;
 	}
 
 	/**

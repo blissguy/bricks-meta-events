@@ -68,6 +68,18 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 - **Last conversion sent** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
 - **Test mode** — save a code from Events Manager → Test Events and conversions from your forms go there instead of counting towards live figures. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
 
+## Tracking a button or a link
+
+Buttons and text links get the same **Meta tracking** panel, with a shorter set of outcomes: a click cannot honestly mean somebody created an account, so those options are not offered.
+
+It works on a Bricks **button with no link at all** — one that opens a popup, say — because Bricks renders those as a `button` element rather than an `a`. That is also why the event is never guessed from the `href`: on a large share of buttons there is no href to read.
+
+Settings are resolved on the server and travel on the element in a `data-bme` attribute, read by one delegated listener rather than a script per element. That keeps it working inside popups, query loops and anything rendered later.
+
+- **Counted once per element per visit.** Someone tapping a phone number twice is one intention.
+- **An element you configured beats the phone and email sweep**, so a tracked `tel:` link fires once, not twice.
+- **The label is resolved server-side.** Text containing unresolved dynamic data is skipped, because a button reading `Download {post_title}` would otherwise become a separate entry for every post. Where no label resolves, the visible text is used at click time.
+
 ## Tracking anything else
 
 `window.bmeTrack( name, params )` records an event the plugin cannot see for itself. It goes through the same sender as everything else, so it respects cookie consent and skips excluded visitors.
@@ -79,6 +91,16 @@ bmeTrack( 'Contact', { content_name: 'Live chat opened' } );
 From Bricks, wire it without code: select the element, add an **Interaction**, set trigger **click**, action **JavaScript (Function)**, function name `bmeTrack`, and pass the event name and details as arguments.
 
 Anything outside Meta's standard event list is sent as a custom event automatically. Like all click tracking these are browser only and carry no customer details, because a click is not a confirmed enquiry.
+
+## Updates
+
+Updates arrive on the Plugins screen from this repository's GitHub releases, via [plugin-update-checker](https://github.com/YahnisElsts/plugin-update-checker) vendored in `lib/`.
+
+The release workflow publishes a versioned ZIP built from `.distignore`, and the updater is pointed at that asset specifically. Left to itself it would offer GitHub's own source archive, which unpacks as `bricks-meta-events-main/` and would not activate.
+
+The repository is public, so no credentials are needed. GitHub rate limits anonymous API calls per IP, which shared hosting can occasionally hit; if that happens, define `BME_GITHUB_TOKEN` in `wp-config.php` or filter `bme_github_token`.
+
+**Both ignore files anchor their patterns to the plugin root.** An unanchored `vendor` matches `lib/plugin-update-checker/vendor` too, which strips Parsedown and the readme parser and ships a broken updater. Verified in both files.
 
 ## Site-wide settings
 
@@ -99,7 +121,7 @@ Anything outside Meta's standard event list is sent as a custom event automatica
 
 ## Status
 
-`0.7.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode, site-wide settings, `bmeTrack()` and optional phone and email link tracking. Per-element controls on buttons and links are deliberately not included; see **Tracking anything else**.
+`0.8.0` — feature complete against the build plan: form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode, site-wide settings, per-element button and link tracking, `bmeTrack()`, and updates from GitHub releases.
 
 ## Licence
 

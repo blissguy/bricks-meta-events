@@ -12,9 +12,12 @@
  *  2. window.bmeTrack(), for anything the plugin cannot see. Bricks
  *     Interactions can call it directly.
  *
- *  3. Optional tel: and mailto: clicks. One delegated listener rather than
- *     per-element wiring, so it survives popups, query loops and anything
- *     loaded in later, and nothing needs baking into cached HTML.
+ *  3. Clicks. Buttons and links configured in the builder carry their
+ *     settings in a data-bme attribute, and optionally every tel: and mailto:
+ *     link is swept up as well. Both go through one delegated listener rather
+ *     than a script per element, so they survive popups, query loops and
+ *     anything rendered later. A configured element wins over the sweep, so a
+ *     configured phone link fires once, not twice.
  *
  * A click is not a confirmed enquiry, so 2 and 3 are browser only and carry
  * no customer details.
@@ -114,41 +117,82 @@
 		return false;
 	}
 
-	function describe( link, href ) {
-		var text = ( link.textContent || '' ).replace( /\s+/g, ' ' ).trim();
+	function describe( element, href ) {
+		var text = ( element.textContent || '' ).replace( /\s+/g, ' ' ).trim();
 
-		return text || href.replace( /^(tel:|mailto:)/, '' );
+		return text || String( href ).replace( /^(tel:|mailto:)/, '' );
 	}
 
-	if ( config.enabled && config.trackLinks ) {
+	/**
+	 * One listener for every tracked click.
+	 *
+	 * An element configured in the builder wins outright: if it also happens
+	 * to be a phone link, the sweep below must not fire a second event for the
+	 * same click.
+	 */
+	function onClick( event ) {
+		var target = event.target;
+
+		if ( ! target || typeof target.closest !== 'function' ) {
+			return;
+		}
+
+		var configured = target.closest( '[data-bme]' );
+
+		if ( configured ) {
+			fireConfigured( configured );
+
+			return;
+		}
+
+		if ( config.trackLinks ) {
+			fireLink( target.closest( 'a[href^="tel:"], a[href^="mailto:"]' ) );
+		}
+	}
+
+	function fireConfigured( element ) {
+		var payload;
+
+		try {
+			payload = JSON.parse( element.getAttribute( 'data-bme' ) || 'null' );
+		} catch ( e ) {
+			return;
+		}
+
+		if ( ! payload || ! payload.name || alreadyCounted( 'el:' + ( payload.id || payload.name ) ) ) {
+			return;
+		}
+
+		var params = payload.custom || {};
+
+		// No label was resolved on the server, so fall back to what the
+		// visitor actually sees.
+		if ( ! params.content_name ) {
+			params = Object.assign( {}, params, { content_name: describe( element, '' ) } );
+		}
+
+		send( payload.name, params, newEventId(), payload.method );
+	}
+
+	function fireLink( link ) {
+		if ( ! link ) {
+			return;
+		}
+
+		var href = link.getAttribute( 'href' ) || '';
+
+		if ( ! href || alreadyCounted( href ) ) {
+			return;
+		}
+
+		window.bmeTrack( config.contactEvent || 'Contact', {
+			content_name: describe( link, href ),
+		} );
+	}
+
+	if ( config.enabled ) {
 		// Capture phase and delegated from the document, so it still fires
 		// when something else stops the event or replaces the markup.
-		document.addEventListener(
-			'click',
-			function ( event ) {
-				var target = event.target;
-
-				if ( ! target || typeof target.closest !== 'function' ) {
-					return;
-				}
-
-				var link = target.closest( 'a[href^="tel:"], a[href^="mailto:"]' );
-
-				if ( ! link ) {
-					return;
-				}
-
-				var href = link.getAttribute( 'href' ) || '';
-
-				if ( ! href || alreadyCounted( href ) ) {
-					return;
-				}
-
-				window.bmeTrack( config.contactEvent || 'Contact', {
-					content_name: describe( link, href ),
-				} );
-			},
-			true
-		);
+		document.addEventListener( 'click', onClick, true );
 	}
 }() );

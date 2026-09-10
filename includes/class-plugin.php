@@ -78,6 +78,8 @@ class Plugin {
 	public function boot(): void {
 		Element_Controls::register();
 		Form_Tracker::register();
+		Click_Tracker::register();
+		Updater::register( FILE );
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_tracking' ) );
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
