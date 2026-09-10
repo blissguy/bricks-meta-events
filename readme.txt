@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.3
+Stable tag: 0.8.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.8.4 =
+* Renamed the two success results on the Diagnostics screen so they no longer read as the same news. "Accepted by Meta" is now "Received by Meta, confirmed", and "Sent in the background and confirmed on its way to Meta" is now "Sent in the background, not confirmed by Meta".
+* Only the first of those means Meta acknowledged the conversion. The second means the handover ran and a send was attempted, which is all the background route can ever report.
 
 = 0.8.3 =
 * Shortened the plugin description on the Plugins screen, which repeated the "Requires: Meta pixel for WordPress" line WordPress already shows, and never mentioned that button and link clicks are covered too.

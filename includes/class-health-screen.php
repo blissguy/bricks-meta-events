@@ -324,6 +324,12 @@ class Health_Screen {
 	 * while ago and never went out is not an unknown, it is a failure, and
 	 * saying so is the whole point of this panel.
 	 *
+	 * The two OK results deliberately end on "confirmed" and "not confirmed".
+	 * Only the inline route reads Meta's own reply, so only it can claim
+	 * receipt; the background route can report that the send was attempted
+	 * and nothing more. An earlier wording called both confirmed, which made
+	 * the weaker one look like the stronger. Do not reinstate it.
+	 *
 	 * @param array $last Stored conversion record.
 	 *
 	 * @return array{0: string, 1: string}
@@ -332,7 +338,7 @@ class Health_Screen {
 		$outcome = $last['outcome'] ?? 'handed_off';
 
 		if ( 'accepted' === $outcome ) {
-			return array( Diagnostics::OK, __( 'Accepted by Meta', 'bricks-meta-events' ) );
+			return array( Diagnostics::OK, __( 'Received by Meta, confirmed', 'bricks-meta-events' ) );
 		}
 
 		if ( 'rejected' === $outcome ) {
@@ -344,7 +350,7 @@ class Health_Screen {
 		}
 
 		if ( ! empty( $last['delivered_at'] ) ) {
-			return array( Diagnostics::OK, __( 'Sent in the background and confirmed on its way to Meta', 'bricks-meta-events' ) );
+			return array( Diagnostics::OK, __( 'Sent in the background, not confirmed by Meta', 'bricks-meta-events' ) );
 		}
 
 		// Long enough that a working background send would have reported in.
