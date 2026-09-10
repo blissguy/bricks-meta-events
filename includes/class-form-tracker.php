@@ -1,11 +1,15 @@
 <?php
 /**
- * Sends a Conversions API event when a Bricks form submits successfully.
+ * Sends conversion events when a Bricks form submits successfully.
  *
  * Hooks bricks/form/response rather than bricks/form/submit: submit fires
  * before validation, spam checks and the nonce check, and fires a second time
  * when Bricks regenerates an expired nonce and resubmits. Only the response
  * filter corresponds to a real conversion.
+ *
+ * Both the Conversions API event and its browser counterpart are built from
+ * one Event object so they share an event_id, which is what lets Meta
+ * deduplicate the pair instead of counting two conversions.
  *
  * @package BricksMetaEvents
  */
@@ -15,15 +19,17 @@ namespace BricksMetaEvents;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Server-side form conversion tracking.
+ * Form conversion tracking, server side and browser side.
  */
 class Form_Tracker {
 
+	public const MODE_AUTO    = 'auto';
+	public const MODE_BOTH    = 'both';
+	public const MODE_SERVER  = 'server';
+	public const MODE_BROWSER = 'browser';
+
 	/**
 	 * Events built during this request, keyed by form element ID.
-	 *
-	 * Kept so the browser echo can reuse the same event_id rather than
-	 * minting its own, which would defeat deduplication.
 	 *
 	 * @var array<string, object>
 	 */
@@ -38,7 +44,7 @@ class Form_Tracker {
 	}
 
 	/**
-	 * Build and send the server event, then hand the response back untouched.
+	 * Entry point for the Bricks response filter.
 	 *
 	 * @param array  $response Bricks AJAX response.
 	 * @param object $form     Bricks form object.
@@ -51,22 +57,21 @@ class Form_Tracker {
 		}
 
 		try {
-			self::track( $response, $form );
+			return self::handle( $response, $form );
 		} catch ( \Throwable $e ) {
 			// A tracking failure must never break the form for the visitor.
 			self::log( 'Exception while tracking: ' . $e->getMessage() );
-		}
 
-		return $response;
+			return $response;
+		}
 	}
 
 	/**
 	 * Give a Custom-action-only form a result so it reaches our filter.
 	 *
-	 * Bricks short-circuits with an early wp_send_json_success() when no
-	 * action has recorded a result, which skips bricks/form/response entirely.
-	 * The Custom action is the only built-in that records nothing, so a form
-	 * whose sole action is Custom would never be tracked. A bare success
+	 * Bricks short-circuits with an early wp_send_json_success() when no action
+	 * has recorded a result, which skips bricks/form/response entirely. The
+	 * Custom action is the only built-in that records nothing. A bare success
 	 * result is inert: finish() only overwrites the message when one is set,
 	 * and only sets refreshPage when that key is present.
 	 *
@@ -96,36 +101,31 @@ class Form_Tracker {
 	}
 
 	/* ---------------------------------------------------------------------
-	 * Internals
+	 * Core
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * Gate, build and dispatch.
+	 * Gate, build, dispatch, and attach the browser payload.
 	 *
 	 * @param array  $response Bricks AJAX response.
 	 * @param object $form     Bricks form object.
 	 */
-	private static function track( array $response, $form ): void {
+	private static function handle( array $response, $form ): array {
 		if ( 'success' !== ( $response['type'] ?? '' ) ) {
-			return;
+			return $response;
 		}
 
 		$settings = (array) $form->get_settings();
 
 		if ( ! self::is_tracked( $settings ) ) {
-			return;
+			return $response;
 		}
 
-		// The host plugin drops these events on its own side anyway. Deciding
-		// here, once, keeps the browser echo consistent with the server.
+		// The host plugin discards these on its own side. Deciding once, here,
+		// keeps the browser echo consistent with the server rather than
+		// letting one fire without the other.
 		if ( Host_Adapter::is_internal_user() ) {
-			return;
-		}
-
-		if ( ! Host_Adapter::can_send_server_events() ) {
-			self::log( 'Host plugin compatibility probes failing; no server event sent.' );
-
-			return;
+			return $response;
 		}
 
 		$event_name = Event_Map::resolve( $settings );
@@ -133,15 +133,88 @@ class Form_Tracker {
 		if ( '' === $event_name ) {
 			self::log( 'Form ' . $form->get_id() . ' is set to a custom event but has no event name.' );
 
-			return;
+			return $response;
 		}
 
 		$mapper   = new Field_Mapper( $form );
 		$identity = $mapper->identity();
 		$label    = Label_Resolver::resolve( $form );
+		$mode     = self::resolve_mode( $settings, $response );
 
 		foreach ( $mapper->notes() as $note ) {
 			self::log( 'Form ' . $form->get_id() . ': ' . $note );
+		}
+
+		$event = self::build_event( $event_name, $identity, $label, $form );
+
+		if ( null !== $event && self::MODE_BROWSER !== $mode ) {
+			self::dispatch( $event );
+			self::$sent[ (string) $form->get_id() ] = $event;
+		}
+
+		if ( self::MODE_SERVER !== $mode ) {
+			$response['bme_event'] = self::browser_payload( $event, $event_name, $label );
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Decide where this conversion should be sent.
+	 *
+	 * On `auto`, two things drive the decision. A form that redirects or
+	 * refreshes tears the page down immediately, so the browser event would
+	 * usually be cancelled mid-flight — and because the browser pixel cannot
+	 * carry advanced matching at all, it holds nothing the server event does
+	 * not already have. Sending server-only there loses nothing and removes
+	 * the race entirely. Conversely, when the Conversions API is unavailable
+	 * the browser is the only route left.
+	 *
+	 * @param array $settings Bricks element settings.
+	 * @param array $response Bricks AJAX response, already carrying redirect keys.
+	 */
+	private static function resolve_mode( array $settings, array $response ): string {
+		$mode = $settings['bmeSendMode'] ?? self::MODE_AUTO;
+
+		if ( in_array( $mode, array( self::MODE_BOTH, self::MODE_SERVER, self::MODE_BROWSER ), true ) ) {
+			return $mode;
+		}
+
+		if ( ! empty( $response['redirectTo'] ) || ! empty( $response['refreshPage'] ) ) {
+			return self::MODE_SERVER;
+		}
+
+		if ( ! self::capi_available() ) {
+			return self::MODE_BROWSER;
+		}
+
+		return self::MODE_BOTH;
+	}
+
+	/**
+	 * Whether a Conversions API send could actually succeed right now.
+	 */
+	private static function capi_available(): bool {
+		return Host_Adapter::can_send_server_events()
+			&& Host_Adapter::has_access_token()
+			&& Host_Adapter::circuit_breaker_ok();
+	}
+
+	/**
+	 * Build the Event, or null when the host plugin cannot be used.
+	 *
+	 * @param string $event_name Meta event name.
+	 * @param array  $identity   Hashable identity values.
+	 * @param string $label      Resolved content_name.
+	 * @param object $form       Bricks form object.
+	 *
+	 * @return object|null
+	 */
+	private static function build_event( string $event_name, array $identity, string $label, $form ) {
+		if ( ! Host_Adapter::can_send_server_events() ) {
+			self::log( 'Host plugin compatibility probes failing; browser-only fallback.' );
+
+			return null;
 		}
 
 		$event = call_user_func(
@@ -156,25 +229,61 @@ class Form_Tracker {
 		if ( ! is_object( $event ) ) {
 			self::log( 'Event factory returned nothing for form ' . $form->get_id() . '.' );
 
-			return;
+			return null;
 		}
 
 		self::decorate( $event, $form );
-		self::dispatch( $event );
 
-		self::$sent[ (string) $form->get_id() ] = $event;
+		return $event;
 	}
+
+	/**
+	 * The payload the browser needs to fire the matching pixel event.
+	 *
+	 * The event name and method come from the server so the client can never
+	 * disagree with what was sent server-side: divergent names would produce
+	 * two conversions rather than one deduplicated pair.
+	 *
+	 * @param object|null $event      Event object, when one was built.
+	 * @param string      $event_name Meta event name.
+	 * @param string      $label      Resolved content_name.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function browser_payload( $event, string $event_name, string $label ): array {
+		$event_id = is_object( $event ) && method_exists( $event, 'getEventId' )
+			? (string) $event->getEventId()
+			: wp_generate_uuid4();
+
+		return array(
+			'name'     => $event_name,
+			'event_id' => $event_id,
+			// trackCustom is required for anything outside Meta's standard
+			// list; hardcoding 'track' would silently drop custom events.
+			'method'   => Event_Map::is_standard( $event_name ) ? 'track' : 'trackCustom',
+			'custom'   => array_filter(
+				array(
+					'content_name'            => $label,
+					'fb_integration_tracking' => Plugin::INTEGRATION_NAME,
+				)
+			),
+		);
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Delivery
+	 * ------------------------------------------------------------------ */
 
 	/**
 	 * Hand the event to the host plugin for delivery.
 	 *
 	 * Normally that means track(), which queues a non-blocking loopback
 	 * request to admin-ajax.php and returns immediately. When the loopback is
-	 * blocked — a firewall, or a local environment that cannot reach itself —
-	 * that request never completes and the event is lost with no error
-	 * anywhere. In that case send synchronously instead: it costs the visitor
-	 * one round trip to Meta on submit, which is a great deal better than
-	 * silently discarding every conversion.
+	 * blocked — a firewall, or an environment that cannot reach itself — that
+	 * request never completes and the event is lost with no error anywhere. In
+	 * that case send synchronously instead: it costs the visitor one round
+	 * trip to Meta, which is a great deal better than silently discarding
+	 * every conversion.
 	 *
 	 * @param object $event Host plugin Event object.
 	 */
@@ -195,6 +304,32 @@ class Form_Tracker {
 	}
 
 	/**
+	 * Whether to bypass the background loopback and send inline.
+	 *
+	 * Reads only the cached loopback verdict — probing here would add a ten
+	 * second timeout to a form submission. With nothing cached, assume the
+	 * normal asynchronous path.
+	 */
+	private static function should_send_synchronously(): bool {
+		if ( ! method_exists( Host_Adapter::CLS_SERVER_EVENT, 'send' ) ) {
+			return false;
+		}
+
+		$broken = Diagnostics::ERROR === Diagnostics::cached_loopback_status();
+
+		/**
+		 * Filters whether Conversions API events are sent inline.
+		 *
+		 * @param bool $synchronous True to send during the request.
+		 */
+		return (bool) apply_filters( 'bme_send_synchronously', $broken );
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Observability
+	 * ------------------------------------------------------------------ */
+
+	/**
 	 * Remember what was last sent, so the health screen can show reality.
 	 *
 	 * Sending is otherwise entirely invisible: nothing is written anywhere,
@@ -209,7 +344,15 @@ class Form_Tracker {
 		$matched   = array();
 
 		if ( is_object( $user_data ) ) {
-			foreach ( array( 'Email' => 'email', 'Phone' => 'phone', 'FirstName' => 'first name', 'LastName' => 'last name', 'ExternalId' => 'account id' ) as $getter => $label ) {
+			$fields = array(
+				'Email'      => 'email',
+				'Phone'      => 'phone',
+				'FirstName'  => 'first name',
+				'LastName'   => 'last name',
+				'ExternalId' => 'account id',
+			);
+
+			foreach ( $fields as $getter => $label ) {
 				$method = 'get' . $getter;
 
 				if ( method_exists( $user_data, $method ) && ! empty( $user_data->$method() ) ) {
@@ -245,28 +388,6 @@ class Form_Tracker {
 	}
 
 	/**
-	 * Whether to bypass the background loopback and send inline.
-	 *
-	 * Reads only the cached loopback verdict — probing here would add a ten
-	 * second timeout to a form submission. With nothing cached, assume the
-	 * normal asynchronous path.
-	 */
-	private static function should_send_synchronously(): bool {
-		if ( ! method_exists( Host_Adapter::CLS_SERVER_EVENT, 'send' ) ) {
-			return false;
-		}
-
-		$broken = Diagnostics::ERROR === Diagnostics::cached_loopback_status();
-
-		/**
-		 * Filters whether Conversions API events are sent inline.
-		 *
-		 * @param bool $synchronous True to send during the request.
-		 */
-		return (bool) apply_filters( 'bme_send_synchronously', $broken );
-	}
-
-	/**
 	 * The resolved label as it will appear in Events Manager.
 	 *
 	 * @param object $event Host plugin Event object.
@@ -285,12 +406,16 @@ class Form_Tracker {
 		return (string) $custom->getContentName();
 	}
 
+	/* ---------------------------------------------------------------------
+	 * Internals
+	 * ------------------------------------------------------------------ */
+
 	/**
 	 * Add the things safe_create_event() cannot carry for us.
 	 *
 	 * Its custom-data handling is a fixed allowlist — currency, value,
 	 * contents, content_ids, content_type, num_items, content_name and
-	 * content_category. Any other key we return from the callback is computed
+	 * content_category. Any other key returned from the callback is computed
 	 * and then discarded, so extra properties have to be set directly.
 	 *
 	 * @param object $event Host plugin Event object.
@@ -309,10 +434,7 @@ class Form_Tracker {
 
 		// Left alone, the source URL is admin-ajax.php — genuinely the URL
 		// being requested, and useless to Meta for attribution. Bricks posts
-		// the real page URL alongside the form data, so prefer that. When it
-		// is missing or points off-site, fall back to the site root rather
-		// than leaving an endpoint URL (or, in non-web contexts, a malformed
-		// one) on the event.
+		// the real page URL alongside the form data.
 		if ( ! method_exists( $event, 'setEventSourceUrl' ) ) {
 			return;
 		}
@@ -370,7 +492,7 @@ class Form_Tracker {
 	}
 
 	/**
-	 * Record a note for the health screen and, when debugging, the error log.
+	 * Record a note for support and, when debugging, the error log.
 	 */
 	private static function log( string $message ): void {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {

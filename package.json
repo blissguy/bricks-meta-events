@@ -1,0 +1,11 @@
+{
+  "name": "bricks-meta-events",
+  "version": "0.2.0",
+  "description": "Server-verified Meta conversion events for Bricks Builder forms, deduplicated against the browser pixel.",
+  "private": true,
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blissguy/bricks-meta-events.git"
+  }
+}

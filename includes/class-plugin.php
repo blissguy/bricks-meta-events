@@ -46,10 +46,41 @@ class Plugin {
 		Element_Controls::register();
 		Form_Tracker::register();
 
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_browser_echo' ) );
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_notices', array( $this, 'render_admin_notice' ) );
 		add_action( self::CRON_HOOK, array( $this, 'run_scheduled_check' ) );
 		add_action( 'admin_init', array( $this, 'maybe_schedule_cron' ) );
+	}
+
+	/**
+	 * Load the listener that fires the browser half of a conversion.
+	 *
+	 * Enqueued site-wide rather than only on pages known to contain a form:
+	 * forms appear in popups, query loops and AJAX-loaded content, and the
+	 * listener is inert until a tracked submission returns a payload.
+	 */
+	public function enqueue_browser_echo(): void {
+		if ( '' === Host_Adapter::pixel_id() ) {
+			return;
+		}
+
+		/**
+		 * Filters whether the browser-echo listener is loaded.
+		 *
+		 * @param bool $enqueue True to load it.
+		 */
+		if ( ! apply_filters( 'bme_enqueue_browser_echo', true ) ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'bme-browser-echo',
+			plugins_url( 'assets/js/browser-echo.js', FILE ),
+			array(),
+			VERSION,
+			true
+		);
 	}
 
 	/**
@@ -134,7 +165,7 @@ class Plugin {
 			esc_html(
 				sprintf(
 					/* translators: %s: comma-separated list of failing check names. */
-					__( 'conversion tracking is not working correctly — %s.', 'bricks-meta-events' ),
+					__( 'conversion tracking is not working correctly: %s.', 'bricks-meta-events' ),
 					implode( ', ', $problems )
 				)
 			),

@@ -1,0 +1,186 @@
+name: Release on version bump
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release, for example v1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate PHP syntax
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Resolve and verify version
+        id: version
+        run: |
+          set -euo pipefail
+
+          plugin_file="bricks-meta-events.php"
+
+          header_version="$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\(.*\)$/\1/p' "$plugin_file" | head -1 | tr -d '[:space:]')"
+          constant_version="$(sed -n "s/^const VERSION = '\(.*\)';$/\1/p" "$plugin_file" | head -1)"
+          package_version="$(node -p "require('./package.json').version")"
+          stable_tag="$(sed -n 's/^Stable tag:[[:space:]]*\(.*\)$/\1/p' readme.txt | head -1 | tr -d '[:space:]')"
+
+          echo "Plugin header: $header_version"
+          echo "VERSION constant: $constant_version"
+          echo "package.json: $package_version"
+          echo "Stable tag: $stable_tag"
+
+          # Deliberate failure: a mismatch would ship a version that disagrees
+          # with what the site reports after updating.
+          if [ "$header_version" != "$package_version" ]; then
+            echo "::error::Plugin header Version ($header_version) must equal package.json version ($package_version)."
+            exit 1
+          fi
+
+          if [ "$header_version" != "$constant_version" ]; then
+            echo "::error::Plugin header Version ($header_version) must equal the VERSION constant ($constant_version)."
+            exit 1
+          fi
+
+          if [ "$header_version" != "$stable_tag" ]; then
+            echo "::error::Plugin header Version ($header_version) must equal readme.txt Stable tag ($stable_tag)."
+            exit 1
+          fi
+
+          if ! grep -q "^= ${header_version} =$" readme.txt; then
+            echo "::error::readme.txt is missing a '= ${header_version} =' changelog entry."
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            release_tag="${{ inputs.tag }}"
+          else
+            release_tag="v${header_version}"
+          fi
+
+          echo "version=$header_version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            echo "Tag $release_tag already exists; nothing to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build plugin ZIP
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          plugin_slug="bricks-meta-events"
+          build_dir="$RUNNER_TEMP/$plugin_slug"
+          # Versioned filename so the asset is unambiguous when a release
+          # carries more than one.
+          zip_path="$RUNNER_TEMP/${plugin_slug}-${VERSION}.zip"
+
+          mkdir -p "$build_dir"
+
+          # Excludes are applied by rsync while staging the folder, so the ZIP is
+          # built from an already-clean tree. Excluding at zip time would leave
+          # empty directories behind.
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude-from='.distignore' \
+            ./ "$build_dir/"
+
+          cd "$RUNNER_TEMP"
+          # Wrapped in the slug folder so the ZIP installs to the right directory.
+          zip -r "$zip_path" "$plugin_slug"
+
+          echo "ZIP_PATH=$zip_path" >> "$GITHUB_ENV"
+
+      - name: Create tag
+        if: steps.version.outputs.should_release == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
+
+      - name: Build release notes from the changelog
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Notes come from readme.txt rather than --generate-notes, which only
+          # emits a compare link. The release then says what changed in the same
+          # words the plugin screen shows.
+          {
+            echo "Bricks Meta Events ${VERSION}"
+            echo
+            awk -v version="$VERSION" '
+              BEGIN { in_changelog = 0; in_version = 0; }
+              /^==[[:space:]]*Changelog[[:space:]]*==/ { in_changelog = 1; next; }
+              in_changelog && /^==[[:space:]]+[^=]+[[:space:]]*==/ { if (in_version) exit; next; }
+              in_changelog && $0 ~ "^=[[:space:]]*" version "[[:space:]]*=$" { in_version = 1; next; }
+              in_changelog && in_version && /^=[[:space:]]+[^=]+[[:space:]]*=$/ { exit; }
+              in_changelog && in_version { print; }
+            ' readme.txt | sed '/^[[:space:]]*$/d' > changelog-section.txt
+
+            if [ -s changelog-section.txt ]; then
+              cat changelog-section.txt
+            else
+              # The version gate above already fails without a matching entry, so
+              # this only fires if readme.txt changes shape.
+              echo "Release ${VERSION}."
+            fi
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Create or update GitHub release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ZIP_PATH" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Bricks Meta Events ${VERSION}" \
+              --notes-file release-notes.md
+          else
+            gh release create "$RELEASE_TAG" "$ZIP_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Bricks Meta Events ${VERSION}" \
+              --notes-file release-notes.md \
+              --verify-tag
+          fi

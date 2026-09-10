@@ -120,8 +120,8 @@ class Health_Screen {
 		$outcomes = array(
 			'accepted'   => array( Diagnostics::OK, __( 'Accepted by Meta', 'bricks-meta-events' ) ),
 			'rejected'   => array( Diagnostics::ERROR, __( 'Rejected by Meta', 'bricks-meta-events' ) ),
-			'held'       => array( Diagnostics::WARNING, __( 'Held pending consent — not sent', 'bricks-meta-events' ) ),
-			'handed_off' => array( Diagnostics::INFO, __( 'Handed to background delivery — outcome unknown', 'bricks-meta-events' ) ),
+			'held'       => array( Diagnostics::WARNING, __( 'Held pending consent, not sent', 'bricks-meta-events' ) ),
+			'handed_off' => array( Diagnostics::INFO, __( 'Handed to background delivery, outcome unknown', 'bricks-meta-events' ) ),
 		);
 
 		[ $status, $outcome_label ] = $outcomes[ $last['outcome'] ?? 'handed_off' ] ?? $outcomes['handed_off'];
@@ -142,7 +142,7 @@ class Health_Screen {
 				: __( 'Background', 'bricks-meta-events' ),
 			__( 'Identity sent', 'bricks-meta-events' ) => ! empty( $last['matched'] )
 				? implode( ', ', (array) $last['matched'] )
-				: __( 'None — every identifier was stripped, so Meta cannot attribute this conversion.', 'bricks-meta-events' ),
+				: __( 'None. Every identifier was stripped, so Meta cannot attribute this conversion.', 'bricks-meta-events' ),
 		);
 
 		printf( '<p>%s <strong>%s</strong></p>', wp_kses_post( self::status_icon( $status ) ), esc_html( $outcome_label ) );

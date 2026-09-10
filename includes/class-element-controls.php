@@ -110,8 +110,24 @@ class Element_Controls {
 			'type'           => 'text',
 			'hasDynamicData' => false,
 			'placeholder'    => esc_html__( 'Auto', 'bricks-meta-events' ),
-			'description'    => esc_html__( 'Left on Auto, the first of these that exists is used: the Form name under Save submission, the name you gave this element in the structure panel, the submit button text, then the page or template title. Keep it the same for every visitor — Meta groups conversions by this name, so a label that varies per page produces hundreds of unusable rows.', 'bricks-meta-events' ),
 			'required'       => $enabled,
+		);
+
+		$controls['bmeSendMode'] = array(
+			'tab'         => 'content',
+			'group'       => self::GROUP,
+			'label'       => esc_html__( 'Send via', 'bricks-meta-events' ),
+			'type'        => 'select',
+			'options'     => array(
+				Form_Tracker::MODE_AUTO    => esc_html__( 'Automatic', 'bricks-meta-events' ),
+				Form_Tracker::MODE_BOTH    => esc_html__( 'Conversions API and browser pixel', 'bricks-meta-events' ),
+				Form_Tracker::MODE_SERVER  => esc_html__( 'Conversions API only', 'bricks-meta-events' ),
+				Form_Tracker::MODE_BROWSER => esc_html__( 'Browser pixel only', 'bricks-meta-events' ),
+			),
+			'default'     => Form_Tracker::MODE_AUTO,
+			'clearable'   => false,
+			'description' => esc_html__( 'Automatic sends both, and deduplicates them so one conversion is counted. It drops to the Conversions API alone when this form redirects. The page would tear down before the browser event finished, and the browser event carries nothing the server event does not. It drops to the browser alone when the Conversions API is unavailable.', 'bricks-meta-events' ),
+			'required'    => $enabled,
 		);
 
 		$controls['bmeFieldsSeparator'] = array(
@@ -126,7 +142,7 @@ class Element_Controls {
 			'tab'      => 'content',
 			'group'    => self::GROUP,
 			'type'     => 'info',
-			'content'  => esc_html__( 'Email and phone are detected automatically from your field types, and a logged-in visitor is matched by account. Only override when detection gets it wrong. Paste the field\'s ID — open the field above and use the copy button next to ID. The ID survives reordering and relabelling, so the override keeps working. Enter none to never send that identity from this form.', 'bricks-meta-events' ),
+			'content'  => esc_html__( 'Email and phone are detected automatically from your field types, and a logged-in visitor is matched by account. Only override when detection gets it wrong. Paste the field\'s ID copied from each field in your form.', 'bricks-meta-events' ),
 			'required' => $enabled,
 		);
 
@@ -137,7 +153,7 @@ class Element_Controls {
 				'label'          => $label,
 				'type'           => 'text',
 				'hasDynamicData' => false,
-				'placeholder'    => esc_html__( 'Auto-detect — or paste a field ID', 'bricks-meta-events' ),
+				'placeholder'    => esc_html__( 'Auto-detect', 'bricks-meta-events' ),
 				'required'       => $enabled,
 			);
 		}

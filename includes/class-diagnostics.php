@@ -273,7 +273,7 @@ class Diagnostics {
 					$siteurl,
 					$home
 				),
-				__( 'Expected on a local or staging copy of a live site — server-side tracking cannot be tested in that situation. On a production site, correct WordPress Address under Settings → General.', 'bricks-meta-events' )
+				__( 'Expected on a local or staging copy of a live site, where server-side tracking cannot be tested. On a production site, correct WordPress Address under Settings → General.', 'bricks-meta-events' )
 			),
 		);
 	}
@@ -333,7 +333,7 @@ class Diagnostics {
 		$label = __( 'Conversions API circuit breaker', 'bricks-meta-events' );
 
 		if ( Host_Adapter::circuit_breaker_ok() ) {
-			return self::row( 'circuit_breaker', self::OK, $label, __( 'Closed — sends are allowed.', 'bricks-meta-events' ), '' );
+			return self::row( 'circuit_breaker', self::OK, $label, __( 'Closed, sends are allowed.', 'bricks-meta-events' ), '' );
 		}
 
 		return self::row(
@@ -447,7 +447,7 @@ class Diagnostics {
 				'status'  => self::ERROR,
 				'message' => sprintf(
 					/* translators: 1: target URL, 2: error message. */
-					__( 'Could not reach %1$s — %2$s. Conversions API events are delivered through this endpoint, so they are silently failing.', 'bricks-meta-events' ),
+					__( 'Could not reach %1$s: %2$s. Conversions API events are delivered through this endpoint, so they are silently failing.', 'bricks-meta-events' ),
 					$target,
 					$response->get_error_message()
 				),
