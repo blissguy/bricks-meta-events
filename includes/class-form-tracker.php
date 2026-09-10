@@ -63,24 +63,10 @@ class Form_Tracker {
 			return $events;
 		}
 
-		$last = get_option( Plugin::OPTION_LAST_EVENT );
-
-		if ( ! is_array( $last ) || empty( $last['event_id'] ) || ! empty( $last['delivered_at'] ) ) {
-			return $events;
-		}
-
 		foreach ( $events as $event ) {
-			if ( ! is_object( $event ) || ! method_exists( $event, 'getEventId' ) ) {
-				continue;
+			if ( is_object( $event ) && method_exists( $event, 'getEventId' ) ) {
+				Event_Log::confirm( (string) $event->getEventId() );
 			}
-
-			if ( (string) $event->getEventId() !== (string) $last['event_id'] ) {
-				continue;
-			}
-
-			$last['delivered_at'] = time();
-			update_option( Plugin::OPTION_LAST_EVENT, $last, false );
-			break;
 		}
 
 		return $events;
@@ -361,7 +347,12 @@ class Form_Tracker {
 	 */
 	private static function dispatch( $event ): void {
 		if ( self::should_send_synchronously() ) {
-			$result = call_user_func( array( Host_Adapter::CLS_SERVER_EVENT, 'send' ), array( $event ) );
+			$test_code = self::test_event_code();
+			$result    = call_user_func(
+				array( Host_Adapter::CLS_SERVER_EVENT, 'send' ),
+				array( $event ),
+				'' !== $test_code ? $test_code : null
+			);
 
 			self::record( $event, 'inline', $result );
 
@@ -385,6 +376,13 @@ class Form_Tracker {
 	private static function should_send_synchronously(): bool {
 		if ( ! method_exists( Host_Adapter::CLS_SERVER_EVENT, 'send' ) ) {
 			return false;
+		}
+
+		// A test code only reaches Meta if this plugin makes the call itself.
+		// The background route sends without one, so anything sent that way
+		// would land in live data and never show in Test Events.
+		if ( '' !== self::test_event_code() ) {
+			return true;
 		}
 
 		$broken = Diagnostics::ERROR === Diagnostics::cached_loopback_status()
@@ -411,7 +409,7 @@ class Form_Tracker {
 			return true;
 		}
 
-		$last = get_option( Plugin::OPTION_LAST_EVENT );
+		$last = Event_Log::latest();
 
 		if ( ! is_array( $last ) || 'handed_off' !== ( $last['outcome'] ?? '' ) ) {
 			return false;
@@ -475,8 +473,7 @@ class Form_Tracker {
 			$outcome = 'held';
 		}
 
-		update_option(
-			Plugin::OPTION_LAST_EVENT,
+		Event_Log::record(
 			array(
 				'time'     => time(),
 				'event'    => method_exists( $event, 'getEventName' ) ? $event->getEventName() : '',
@@ -487,9 +484,18 @@ class Form_Tracker {
 				'mode'     => $mode,
 				'outcome'  => $outcome,
 				'response' => is_array( $result ) ? $result : null,
-			),
-			false
+			)
 		);
+	}
+
+	/**
+	 * The Events Manager test code, when one is set for this site.
+	 *
+	 * Set only while checking a setup. Everything sent while it is filled in
+	 * goes to Test Events instead of the real figures.
+	 */
+	public static function test_event_code(): string {
+		return trim( (string) get_option( Plugin::OPTION_TEST_CODE, '' ) );
 	}
 
 	/**

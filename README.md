@@ -65,17 +65,19 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 - **Your own events are discarded.** The host plugin drops events from anyone who can `edit_posts` or `upload_files`, with no filter. You cannot test as an administrator. Every role holding either capability is listed — on a membership site, a member role with `upload_files` silently voids every paying customer's conversion.
 - **Loopback delivery.** Conversions API events normally ride a non-blocking request from WordPress to its own `admin-ajax.php`. Security plugins routinely block it and the events vanish with no error. When the probe detects this, events are sent **inline** during submission instead — one extra round trip to Meta, rather than silent total loss. Filterable via `bme_send_synchronously`.
 - **Send a test event** — builds a real event and sends it synchronously, bypassing the background loopback, then prints Meta's raw response and which identifiers survived matching.
-- **Last conversion sent** — event, resolved label, event ID, source URL, delivery mode, outcome and matched identifiers.
+- **Last conversion sent** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
+- **Test mode** — save a code from Events Manager → Test Events and conversions from your forms go there instead of counting towards live figures. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
 
 ## Filters
 
 | Filter | Purpose |
 |---|---|
-| `bme_send_synchronously` | Force or prevent inline Conversions API delivery. Defaults to inline only when the loopback probe has failed. |
+| `bme_send_synchronously` | Force or prevent inline Conversions API delivery. Defaults to inline when the loopback probe has failed, when a handed-over conversion was never confirmed, or when test mode is on. |
+| `bme_enqueue_browser_echo` | Return false to stop loading the browser listener. |
 
 ## Status
 
-`0.1.0` — form tracking and diagnostics. Browser echo with shared `event_id`, per-form defaults, an event log, and click tracking for buttons and links are not in this release.
+`0.5.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log and test mode. Site-wide defaults and click tracking for buttons and links are not in this release.
 
 ## Licence
 

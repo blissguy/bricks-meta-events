@@ -36,7 +36,9 @@ class Health_Screen {
 
 		self::render_checks();
 		self::render_last_event();
+		self::render_log();
 		self::render_loopback();
+		self::render_test_mode();
 		self::render_test_event();
 
 		echo '</div>';
@@ -64,6 +66,33 @@ class Health_Screen {
 				Diagnostics::OK === $result['status'] ? 'success' : 'error',
 				esc_html( $result['message'] )
 			);
+		}
+
+		if ( 'save_test_code' === $action ) {
+			$code = isset( $_POST['bme_test_code'] )
+				? sanitize_text_field( wp_unslash( $_POST['bme_test_code'] ) )
+				: '';
+
+			if ( '' === $code ) {
+				delete_option( Plugin::OPTION_TEST_CODE );
+
+				return '<div class="notice notice-success"><p>'
+					. esc_html__( 'Test mode is off. Conversions are going to your real figures again.', 'bricks-meta-events' )
+					. '</p></div>';
+			}
+
+			update_option( Plugin::OPTION_TEST_CODE, $code, false );
+
+			return '<div class="notice notice-warning"><p>'
+				. esc_html__( 'Test mode is on. Conversions from your forms will go to Test Events, not your real figures.', 'bricks-meta-events' )
+				. '</p></div>';
+		}
+
+		if ( 'clear_log' === $action ) {
+			Event_Log::clear();
+
+			return '<div class="notice notice-success"><p>'
+				. esc_html__( 'Cleared.', 'bricks-meta-events' ) . '</p></div>';
 		}
 
 		if ( 'test_event' === $action ) {
@@ -109,7 +138,7 @@ class Health_Screen {
 	private static function render_last_event(): void {
 		echo '<h2>' . esc_html__( 'Last conversion sent', 'bricks-meta-events' ) . '</h2>';
 
-		$last = get_option( Plugin::OPTION_LAST_EVENT );
+		$last = Event_Log::latest();
 
 		if ( ! is_array( $last ) || empty( $last['event'] ) ) {
 			echo '<p>' . esc_html__( 'Nothing yet. Send a tracked form while signed out and it will show up here.', 'bricks-meta-events' ) . '</p>';
@@ -199,6 +228,97 @@ class Health_Screen {
 		}
 
 		return array( Diagnostics::INFO, __( 'Just handed over for background sending. Reload in a minute to see whether it went out.', 'bricks-meta-events' ) );
+	}
+
+	/**
+	 * Render the recent conversions table.
+	 *
+	 * The most recent one is shown in full above; this is the history behind
+	 * it, which is what makes a pattern visible rather than a snapshot.
+	 */
+	private static function render_log(): void {
+		$log = Event_Log::all();
+
+		if ( count( $log ) < 2 ) {
+			return;
+		}
+
+		echo '<h2>' . esc_html__( 'Earlier conversions', 'bricks-meta-events' ) . '</h2>';
+		echo '<table class="widefat striped"><thead><tr>';
+
+		foreach (
+			array(
+				__( 'When', 'bricks-meta-events' ),
+				__( 'Event', 'bricks-meta-events' ),
+				__( 'Name in Events Manager', 'bricks-meta-events' ),
+				__( 'Result', 'bricks-meta-events' ),
+				__( 'Customer details sent', 'bricks-meta-events' ),
+			) as $heading
+		) {
+			printf( '<th>%s</th>', esc_html( $heading ) );
+		}
+
+		echo '</tr></thead><tbody>';
+
+		foreach ( array_slice( $log, 1 ) as $entry ) {
+			[ $status, $label ] = self::resolve_outcome( $entry );
+
+			printf(
+				'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s %s</td><td>%s</td></tr>',
+				esc_html(
+					sprintf(
+						/* translators: %s: human-readable time difference. */
+						__( '%s ago', 'bricks-meta-events' ),
+						human_time_diff( (int) ( $entry['time'] ?? 0 ) )
+					)
+				),
+				esc_html( (string) ( $entry['event'] ?? '' ) ),
+				esc_html( (string) ( $entry['label'] ?? '' ) ),
+				wp_kses_post( self::status_icon( $status ) ),
+				esc_html( $label ),
+				esc_html(
+					! empty( $entry['matched'] )
+						? implode( ', ', (array) $entry['matched'] )
+						: __( 'none', 'bricks-meta-events' )
+				)
+			);
+		}
+
+		echo '</tbody></table>';
+		self::form( 'clear_log', __( 'Clear this list', 'bricks-meta-events' ) );
+	}
+
+	/**
+	 * Render the test mode block.
+	 *
+	 * Without this, a real form submission always counts towards the live
+	 * figures, so there is no way to check a setup without dirtying the data
+	 * you report on.
+	 */
+	private static function render_test_mode(): void {
+		$code = Form_Tracker::test_event_code();
+
+		echo '<h2>' . esc_html__( 'Test mode', 'bricks-meta-events' ) . '</h2>';
+		echo '<p>' . esc_html__( 'While a code is saved here, conversions from your forms go to Events Manager, Test Events instead of your real figures. Copy the code from the Test Events tab, and empty this box when you have finished checking.', 'bricks-meta-events' ) . '</p>';
+
+		if ( '' !== $code ) {
+			printf(
+				'<p>%s <strong>%s</strong></p>',
+				wp_kses_post( self::status_icon( Diagnostics::WARNING ) ),
+				esc_html__( 'Test mode is on, so none of these conversions are counting towards your real figures.', 'bricks-meta-events' )
+			);
+		}
+
+		echo '<form method="post">';
+		wp_nonce_field( self::NONCE_ACTION );
+		echo '<input type="hidden" name="bme_action" value="save_test_code">';
+		printf(
+			'<input type="text" name="bme_test_code" class="regular-text" value="%s" placeholder="%s"> ',
+			esc_attr( $code ),
+			esc_attr__( 'TEST12345', 'bricks-meta-events' )
+		);
+		submit_button( __( 'Save', 'bricks-meta-events' ), 'secondary', 'submit', false );
+		echo '</form>';
 	}
 
 	/**

@@ -16,8 +16,9 @@ class Plugin {
 
 	public const CRON_HOOK       = 'bme_daily_health_check';
 	public const OPTION_AAM_LAST   = 'bme_aam_last_status';
-	public const OPTION_LAST_EVENT = 'bme_last_event';
 	public const OPTION_BACKGROUND_BROKEN = 'bme_background_broken';
+	public const OPTION_EVENT_LOG         = 'bme_event_log';
+	public const OPTION_TEST_CODE         = 'bme_test_event_code';
 
 	/**
 	 * Identifies this plugin's events to the host plugin and to Meta.
@@ -54,6 +55,9 @@ class Plugin {
 		}
 
 		Diagnostics::loopback( true );
+
+		// Retired in 0.5.0, when the single last-conversion record became a log.
+		delete_option( 'bme_last_event' );
 	}
 
 	/**
