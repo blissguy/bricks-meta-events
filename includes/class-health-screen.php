@@ -34,6 +34,7 @@ class Health_Screen {
 			echo wp_kses_post( $notice );
 		}
 
+		self::render_settings();
 		self::render_checks();
 		self::render_last_event();
 		self::render_log();
@@ -66,6 +67,14 @@ class Health_Screen {
 				Diagnostics::OK === $result['status'] ? 'success' : 'error',
 				esc_html( $result['message'] )
 			);
+		}
+
+		if ( 'save_settings' === $action ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- check_admin_referer() ran above.
+			Settings::save( wp_unslash( $_POST ) );
+
+			return '<div class="notice notice-success"><p>'
+				. esc_html__( 'Saved.', 'bricks-meta-events' ) . '</p></div>';
 		}
 
 		if ( 'save_test_code' === $action ) {
@@ -104,6 +113,112 @@ class Health_Screen {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Render the site-wide settings.
+	 *
+	 * Everything here can be overridden on an individual form. It exists so a
+	 * site with thirty forms does not need the same decision thirty times.
+	 */
+	private static function render_settings(): void {
+		$settings = Settings::all();
+
+		echo '<h2>' . esc_html__( 'Settings', 'bricks-meta-events' ) . '</h2>';
+		echo '<form method="post">';
+		wp_nonce_field( self::NONCE_ACTION );
+		echo '<input type="hidden" name="bme_action" value="save_settings">';
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		// Default outcome for newly tracked forms.
+		echo '<tr><th scope="row"><label for="bme-default-intent">'
+			. esc_html__( 'What most of your forms mean', 'bricks-meta-events' ) . '</label></th><td>';
+		echo '<select name="default_intent" id="bme-default-intent">';
+
+		foreach ( Event_Map::options() as $value => $label ) {
+			printf(
+				'<option value="%s"%s>%s</option>',
+				esc_attr( $value ),
+				selected( $value, Settings::default_intent(), false ),
+				esc_html( $label )
+			);
+		}
+
+		echo '</select>';
+		echo '<p class="description">' . esc_html__( 'Newly tracked forms start on this. You can change it on any form.', 'bricks-meta-events' ) . '</p>';
+		echo '</td></tr>';
+
+		// Currency used when a form has a value but no currency.
+		printf(
+			'<tr><th scope="row"><label for="bme-currency">%s</label></th><td>'
+			. '<input type="text" name="currency" id="bme-currency" class="small-text" value="%s" placeholder="%s">'
+			. '<p class="description">%s</p></td></tr>',
+			esc_html__( 'Currency', 'bricks-meta-events' ),
+			esc_attr( (string) $settings['currency'] ),
+			esc_attr( Settings::default_currency() ),
+			esc_html__( 'Used when a form has a value but no currency of its own. Leave blank to use your store currency.', 'bricks-meta-events' )
+		);
+
+		// Roles our own setting can actually affect.
+		$selectable = self::selectable_roles();
+
+		echo '<tr><th scope="row">' . esc_html__( 'Do not track these people', 'bricks-meta-events' ) . '</th><td>';
+
+		if ( empty( $selectable ) ) {
+			echo '<p class="description">' . esc_html__( 'Every role on this site is already excluded by Meta pixel for WordPress.', 'bricks-meta-events' ) . '</p>';
+		} else {
+			foreach ( $selectable as $slug => $name ) {
+				printf(
+					'<label style="display:block;margin-bottom:4px"><input type="checkbox" name="excluded_roles[]" value="%s"%s> %s</label>',
+					esc_attr( $slug ),
+					checked( in_array( $slug, Settings::excluded_roles(), true ), true, false ),
+					esc_html( $name )
+				);
+			}
+
+			echo '<p class="description">' . esc_html__( 'Signed in visitors with these roles are skipped. Useful when you do not want existing customers counted as new enquiries. Roles that can edit posts or upload files are already skipped and are not listed.', 'bricks-meta-events' ) . '</p>';
+		}
+
+		echo '</td></tr>';
+
+		// The blanket privacy switch.
+		printf(
+			'<tr><th scope="row">%s</th><td><label><input type="checkbox" name="never_send_details" value="1"%s> %s</label>'
+			. '<p class="description">%s</p></td></tr>',
+			esc_html__( 'Customer details', 'bricks-meta-events' ),
+			checked( Settings::never_send_details(), true, false ),
+			esc_html__( 'Never send them', 'bricks-meta-events' ),
+			esc_html__( 'Turn this on and no email, phone, name or account is sent from any form. Meta still counts the enquiry but cannot tell who made it, so your ad results will look worse. Only use it if you have to.', 'bricks-meta-events' )
+		);
+
+		echo '</tbody></table>';
+		submit_button( __( 'Save settings', 'bricks-meta-events' ), 'primary', 'submit', false );
+		echo '</form>';
+	}
+
+	/**
+	 * Roles this plugin's exclusion setting can actually change.
+	 *
+	 * Anyone who can edit posts or upload files is already discarded inside
+	 * Meta pixel for WordPress, so offering a checkbox for them would be a
+	 * control that does nothing.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function selectable_roles(): array {
+		$roles = array();
+
+		foreach ( wp_roles()->roles as $slug => $role ) {
+			$caps = isset( $role['capabilities'] ) ? (array) $role['capabilities'] : array();
+
+			if ( ! empty( $caps['edit_posts'] ) || ! empty( $caps['upload_files'] ) ) {
+				continue;
+			}
+
+			$roles[ $slug ] = ! empty( $role['name'] ) ? $role['name'] : $slug;
+		}
+
+		return $roles;
 	}
 
 	/**

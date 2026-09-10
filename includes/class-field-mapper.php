@@ -63,6 +63,12 @@ class Field_Mapper {
 	 * @return array<string, string>
 	 */
 	public function identity(): array {
+		// A site-wide choice to send nothing that could identify anyone. Meta
+		// still counts the enquiry, it just cannot attribute it.
+		if ( Settings::never_send_details() ) {
+			return array();
+		}
+
 		$settings = (array) $this->form->get_settings();
 		$identity = array();
 

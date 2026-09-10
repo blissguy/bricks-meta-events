@@ -89,7 +89,7 @@ class Element_Controls {
 			'label'       => esc_html__( 'What does sending this form mean?', 'bricks-meta-events' ),
 			'type'        => 'select',
 			'options'     => Event_Map::options(),
-			'default'     => Event_Map::DEFAULT_INTENT,
+			'default'     => Settings::default_intent(),
 			'clearable'   => false,
 			'description' => esc_html__( 'The name in brackets is what you will see in Meta Events Manager.', 'bricks-meta-events' ),
 			'required'    => $enabled,
@@ -202,9 +202,7 @@ class Element_Controls {
 	 * The currency to suggest, preferring the store's own setting.
 	 */
 	public static function default_currency(): string {
-		$woo = get_option( 'woocommerce_currency' );
-
-		return is_string( $woo ) && '' !== $woo ? $woo : 'USD';
+		return Settings::default_currency();
 	}
 
 	/**

@@ -19,6 +19,7 @@ class Plugin {
 	public const OPTION_BACKGROUND_BROKEN = 'bme_background_broken';
 	public const OPTION_EVENT_LOG         = 'bme_event_log';
 	public const OPTION_TEST_CODE         = 'bme_test_event_code';
+	public const OPTION_SETTINGS          = 'bme_settings';
 
 	/**
 	 * Identifies this plugin's events to the host plugin and to Meta.

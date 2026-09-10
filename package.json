@@ -1,6 +1,6 @@
 {
   "name": "bricks-meta-events",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Tracks Bricks form submissions in Meta, sent from your site and the visitor's browser and counted only once.",
   "private": true,
   "license": "GPL-2.0-or-later",

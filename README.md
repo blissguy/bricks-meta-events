@@ -68,6 +68,15 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 - **Last conversion sent** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
 - **Test mode** — save a code from Events Manager → Test Events and conversions from your forms go there instead of counting towards live figures. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
 
+## Site-wide settings
+
+**Settings → Bricks Meta Events → Settings.** Each one is a default that any individual form can override:
+
+- **What most of your forms mean** — newly tracked forms start on this outcome.
+- **Currency** — used when a form sets a value but no currency. Falls back to the WooCommerce currency, then USD.
+- **Do not track these people** — signed-in roles to skip, on top of those the host plugin already discards. Only roles our setting can actually affect are listed; offering a checkbox for an already-excluded role would be a control that does nothing.
+- **Never send customer details** — strips every identifier from every form. Meta still counts the conversion but cannot attribute it.
+
 ## Filters
 
 | Filter | Purpose |
@@ -77,7 +86,7 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 
 ## Status
 
-`0.5.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log and test mode. Site-wide defaults and click tracking for buttons and links are not in this release.
+`0.6.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode and site-wide settings. Click tracking for buttons and links is not in this release.
 
 ## Licence
 

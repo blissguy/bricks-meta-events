@@ -157,6 +157,10 @@ class Form_Tracker {
 			return $response;
 		}
 
+		if ( Settings::current_user_excluded() ) {
+			return $response;
+		}
+
 		$event_name = Event_Map::resolve( $settings );
 
 		if ( '' === $event_name ) {
