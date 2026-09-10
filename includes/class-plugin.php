@@ -79,7 +79,7 @@ class Plugin {
 		Element_Controls::register();
 		Form_Tracker::register();
 
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_browser_echo' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_tracking' ) );
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_notices', array( $this, 'render_admin_notice' ) );
 		add_action( self::CRON_HOOK, array( $this, 'run_scheduled_check' ) );
@@ -87,32 +87,49 @@ class Plugin {
 	}
 
 	/**
-	 * Load the listener that fires the browser half of a conversion.
+	 * Load the browser side tracking.
 	 *
-	 * Enqueued site-wide rather than only on pages known to contain a form:
-	 * forms appear in popups, query loops and AJAX-loaded content, and the
-	 * listener is inert until a tracked submission returns a payload.
+	 * Enqueued site-wide rather than only on pages known to contain a form or
+	 * a phone link: both turn up in popups, query loops and content loaded in
+	 * later, and the script does nothing until something happens.
 	 */
-	public function enqueue_browser_echo(): void {
+	public function enqueue_tracking(): void {
 		if ( '' === Host_Adapter::pixel_id() ) {
 			return;
 		}
 
 		/**
-		 * Filters whether the browser-echo listener is loaded.
+		 * Filters whether the browser tracking script is loaded.
 		 *
 		 * @param bool $enqueue True to load it.
 		 */
-		if ( ! apply_filters( 'bme_enqueue_browser_echo', true ) ) {
+		if ( ! apply_filters( 'bme_enqueue_tracking', true ) ) {
 			return;
 		}
 
 		wp_enqueue_script(
-			'bme-browser-echo',
-			plugins_url( 'assets/js/browser-echo.js', FILE ),
+			'bme-tracking',
+			plugins_url( 'assets/js/tracking.js', FILE ),
 			array(),
 			VERSION,
 			true
+		);
+
+		// Whether this visitor counts at all is decided here, once, so the
+		// browser cannot disagree with the server about who is being tracked.
+		// Written as JSON rather than through wp_localize_script, which turns
+		// every boolean into "1" or an empty string.
+		wp_add_inline_script(
+			'bme-tracking',
+			'window.bmeConfig = ' . wp_json_encode(
+				array(
+					'enabled'      => ! Host_Adapter::is_internal_user() && ! Settings::current_user_excluded(),
+					'trackLinks'   => Settings::track_links(),
+					'contactEvent' => 'Contact',
+					'standard'     => Event_Map::standard_events(),
+				)
+			) . ';',
+			'before'
 		);
 	}
 

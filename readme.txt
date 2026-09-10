@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,11 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.7.0 =
+* Added window.bmeTrack, for recording something the plugin cannot see for itself. It can be called straight from a Bricks Interaction with no code, using trigger click and action JavaScript (Function).
+* Added an optional setting to count a click on a phone number or email address link as getting in touch. Clicks are counted once per link per visit. Off by default, because a click is not a confirmed enquiry and pointing your ads at unverified clicks makes them worse.
+* Anything sent this way is browser only and carries no customer details.
 
 = 0.6.0 =
 * Added a Settings section, so a site with many forms does not need the same decision made on every one of them.

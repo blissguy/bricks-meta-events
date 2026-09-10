@@ -33,6 +33,7 @@ class Settings {
 				'currency'            => '',
 				'excluded_roles'      => array(),
 				'never_send_details'  => false,
+				'track_links'         => false,
 			),
 			is_array( $stored ) ? $stored : array()
 		);
@@ -92,6 +93,17 @@ class Settings {
 	}
 
 	/**
+	 * Whether a click on a phone or email link counts as making contact.
+	 *
+	 * Off by default. A click is not a confirmed enquiry, and telling Meta to
+	 * optimise towards unverified clicks makes the ads worse, so this has to
+	 * be a deliberate choice.
+	 */
+	public static function track_links(): bool {
+		return ! empty( self::all()['track_links'] );
+	}
+
+	/**
 	 * Whether to strip every customer detail before sending, everywhere.
 	 */
 	public static function never_send_details(): bool {
@@ -117,6 +129,7 @@ class Settings {
 				'currency'           => isset( $raw['currency'] ) ? strtoupper( sanitize_text_field( $raw['currency'] ) ) : '',
 				'excluded_roles'     => array_values( array_intersect( $roles, array_keys( wp_roles()->roles ) ) ),
 				'never_send_details' => ! empty( $raw['never_send_details'] ),
+				'track_links'        => ! empty( $raw['track_links'] ),
 			),
 			false
 		);

@@ -68,6 +68,18 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 - **Last conversion sent** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
 - **Test mode** — save a code from Events Manager → Test Events and conversions from your forms go there instead of counting towards live figures. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
 
+## Tracking anything else
+
+`window.bmeTrack( name, params )` records an event the plugin cannot see for itself. It goes through the same sender as everything else, so it respects cookie consent and skips excluded visitors.
+
+```js
+bmeTrack( 'Contact', { content_name: 'Live chat opened' } );
+```
+
+From Bricks, wire it without code: select the element, add an **Interaction**, set trigger **click**, action **JavaScript (Function)**, function name `bmeTrack`, and pass the event name and details as arguments.
+
+Anything outside Meta's standard event list is sent as a custom event automatically. Like all click tracking these are browser only and carry no customer details, because a click is not a confirmed enquiry.
+
 ## Site-wide settings
 
 **Settings → Bricks Meta Events → Settings.** Each one is a default that any individual form can override:
@@ -76,17 +88,18 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 - **Currency** — used when a form sets a value but no currency. Falls back to the WooCommerce currency, then USD.
 - **Do not track these people** — signed-in roles to skip, on top of those the host plugin already discards. Only roles our setting can actually affect are listed; offering a checkbox for an already-excluded role would be a control that does nothing.
 - **Never send customer details** — strips every identifier from every form. Meta still counts the conversion but cannot attribute it.
+- **Phone and email links** — off by default. Turning it on counts a `tel:` or `mailto:` click as `Contact`, deduplicated per link per visit, via one delegated listener rather than per-element markup. Off by default because optimising ads towards unverified clicks makes them worse, so it should be a deliberate choice.
 
 ## Filters
 
 | Filter | Purpose |
 |---|---|
 | `bme_send_synchronously` | Force or prevent inline Conversions API delivery. Defaults to inline when the loopback probe has failed, when a handed-over conversion was never confirmed, or when test mode is on. |
-| `bme_enqueue_browser_echo` | Return false to stop loading the browser listener. |
+| `bme_enqueue_tracking` | Return false to stop loading the browser tracking script. |
 
 ## Status
 
-`0.6.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode and site-wide settings. Click tracking for buttons and links is not in this release.
+`0.7.0` — form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode, site-wide settings, `bmeTrack()` and optional phone and email link tracking. Per-element controls on buttons and links are deliberately not included; see **Tracking anything else**.
 
 ## Licence
 

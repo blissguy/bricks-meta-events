@@ -191,6 +191,16 @@ class Health_Screen {
 			esc_html__( 'Turn this on and no email, phone, name or account is sent from any form. Meta still counts the enquiry but cannot tell who made it, so your ad results will look worse. Only use it if you have to.', 'bricks-meta-events' )
 		);
 
+		// Clicks, unlike form submissions, cannot be verified.
+		printf(
+			'<tr><th scope="row">%s</th><td><label><input type="checkbox" name="track_links" value="1"%s> %s</label>'
+			. '<p class="description">%s</p></td></tr>',
+			esc_html__( 'Phone and email links', 'bricks-meta-events' ),
+			checked( Settings::track_links(), true, false ),
+			esc_html__( 'Count a click as getting in touch', 'bricks-meta-events' ),
+			esc_html__( 'Records a Contact when someone clicks a phone number or email address link. These are clicks rather than confirmed enquiries, so they are less reliable than forms and no customer details are sent with them.', 'bricks-meta-events' )
+		);
+
 		echo '</tbody></table>';
 		submit_button( __( 'Save settings', 'bricks-meta-events' ), 'primary', 'submit', false );
 		echo '</form>';
