@@ -4,11 +4,11 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.2
+Stable tag: 0.8.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Tracks Bricks form submissions in Meta, sent from your site and the visitor's browser and counted only once.
+Sends Bricks form submissions and button clicks to Meta as conversions. No setup of its own: it uses your existing pixel settings.
 
 == Description ==
 
@@ -23,6 +23,10 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.8.3 =
+* Shortened the plugin description on the Plugins screen, which repeated the "Requires: Meta pixel for WordPress" line WordPress already shows, and never mentioned that button and link clicks are covered too.
+* Shortened the help text under How to send it on a form. It spelled out the four choices listed directly above it, so it now names only the two things worth knowing: redirecting forms are handled, and one enquiry is never counted twice.
 
 = 0.8.2 =
 * Corrected the help text under How to send it on a form. It said Automatic always sends from both your site and the visitor's browser, which is not what it does: it sends from your site alone when the form redirects, and from the browser alone when your site cannot reach Meta.
