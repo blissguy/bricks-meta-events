@@ -263,7 +263,7 @@ class Element_Controls {
 			),
 			'default'     => Form_Tracker::MODE_AUTO,
 			'clearable'   => false,
-			'description' => esc_html__( 'Automatic sends both and tells Meta they are the same enquiry, so it is only counted once. Leave it on Automatic unless you have a reason not to.', 'bricks-meta-events' ),
+			'description' => esc_html__( 'Leave this on Automatic: it sends both when it can, your site only when the form redirects, and the visitor\'s browser only when your site cannot reach Meta. When both go out they share one ID, so Meta counts one enquiry rather than two.', 'bricks-meta-events' ),
 			'required'    => $enabled,
 		);
 

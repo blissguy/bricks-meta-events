@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.1
+Stable tag: 0.8.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,9 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.8.2 =
+* Corrected the help text under How to send it on a form. It said Automatic always sends from both your site and the visitor's browser, which is not what it does: it sends from your site alone when the form redirects, and from the browser alone when your site cannot reach Meta.
 
 = 0.8.1 =
 * While test mode is on, tracking now reports what it is doing in the browser console. A click leaves no record on the server, so this is the only way to tell a button that fired from one that quietly did not.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Bricks Meta Events
  * Description:       Tracks Bricks form submissions in Meta. Each one is sent from your site and from the visitor's browser, and counted only once. Uses your existing Meta pixel for WordPress setup, so there is nothing extra to configure.
- * Version:           0.8.1
+ * Version:           0.8.2
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Requires Plugins:  official-facebook-pixel
@@ -18,7 +18,7 @@ namespace BricksMetaEvents;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION = '0.8.1';
+const VERSION = '0.8.2';
 const FILE    = __FILE__;
 const DIR     = __DIR__;
 
