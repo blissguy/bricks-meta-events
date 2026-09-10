@@ -51,14 +51,14 @@ class Event_Map {
 	 */
 	public static function options(): array {
 		return array(
-			'lead'                 => __( 'They become a lead: enquiry, quote, download, newsletter', 'bricks-meta-events' ),
-			'contact'              => __( 'They contact us: question, support, callback request', 'bricks-meta-events' ),
-			'completeRegistration' => __( 'They create an account', 'bricks-meta-events' ),
-			'schedule'             => __( 'They book or schedule something', 'bricks-meta-events' ),
-			'submitApplication'    => __( 'They apply for something: job, programme, membership', 'bricks-meta-events' ),
-			'subscribe'            => __( 'They subscribe to a paid plan', 'bricks-meta-events' ),
-			'startTrial'           => __( 'They start a free trial', 'bricks-meta-events' ),
-			self::CUSTOM_INTENT    => __( 'Something else, with your own event name', 'bricks-meta-events' ),
+			'lead'                 => __( 'They become a lead (Lead)', 'bricks-meta-events' ),
+			'contact'              => __( 'They get in touch (Contact)', 'bricks-meta-events' ),
+			'completeRegistration' => __( 'They create an account (CompleteRegistration)', 'bricks-meta-events' ),
+			'schedule'             => __( 'They book or arrange something (Schedule)', 'bricks-meta-events' ),
+			'submitApplication'    => __( 'They apply for something (SubmitApplication)', 'bricks-meta-events' ),
+			'subscribe'            => __( 'They start a paid plan (Subscribe)', 'bricks-meta-events' ),
+			'startTrial'           => __( 'They start a free trial (StartTrial)', 'bricks-meta-events' ),
+			self::CUSTOM_INTENT    => __( 'Something else', 'bricks-meta-events' ),
 		);
 	}
 

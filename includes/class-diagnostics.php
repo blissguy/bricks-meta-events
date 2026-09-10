@@ -40,9 +40,9 @@ class Diagnostics {
 				self::row(
 					'host_active',
 					self::ERROR,
-					__( 'Meta pixel for WordPress is not loaded', 'bricks-meta-events' ),
-					__( 'This plugin has no pixel ID, no access token and no way to send anything.', 'bricks-meta-events' ),
-					__( 'Activate "Meta pixel for WordPress". Nothing else here will work until you do.', 'bricks-meta-events' )
+					__( 'Meta pixel for WordPress is switched off', 'bricks-meta-events' ),
+					__( 'Without it there is no pixel, and no way to send anything to Meta.', 'bricks-meta-events' ),
+					__( 'Switch on Meta pixel for WordPress. Nothing here works until you do.', 'bricks-meta-events' )
 				),
 			);
 		}
@@ -75,7 +75,7 @@ class Diagnostics {
 	 * through Facebook Business Extension — this is the default state.
 	 */
 	private static function check_advanced_matching(): array {
-		$label = __( 'Advanced matching (identity data)', 'bricks-meta-events' );
+		$label = __( 'Customer matching', 'bricks-meta-events' );
 
 		// The host plugin abandons set_aam_settings() early when no pixel ID
 		// is present, so matching would always read as off here. Reporting
@@ -85,7 +85,7 @@ class Diagnostics {
 				'aam',
 				self::INFO,
 				$label,
-				__( 'Cannot be determined until a pixel ID is configured.', 'bricks-meta-events' ),
+				__( 'Cannot be checked until a pixel is set up.', 'bricks-meta-events' ),
 				''
 			);
 		}
@@ -97,13 +97,13 @@ class Diagnostics {
 				'aam',
 				self::ERROR,
 				$label,
-				__( 'Meta pixel for WordPress has no advanced matching settings loaded, so every email, phone number and name will be stripped from your conversion events before they are sent.', 'bricks-meta-events' ),
-				__( 'Open Settings → Meta and reconnect. If the site is not connected through Facebook Business Extension, these settings are fetched from Meta and cached, so a failed fetch leaves them empty.', 'bricks-meta-events' )
+				__( 'Meta pixel for WordPress has not loaded your matching settings, so email, phone and name are removed from everything you send.', 'bricks-meta-events' ),
+				__( 'Open Settings, Meta and reconnect. These settings come from Meta and are stored for a while, so a failed connection leaves them empty.', 'bricks-meta-events' )
 			);
 		}
 
 		if ( ! $settings->getEnableAutomaticMatching() ) {
-			$message = __( 'Advanced matching is OFF. Conversion events will still reach Meta and your totals will look correct, but every hashed identifier is discarded first, so Meta cannot attribute conversions to the people who saw your ads. Match quality will be near zero.', 'bricks-meta-events' );
+			$message = __( 'Customer matching is switched off. Your enquiries still reach Meta and the totals look right, but email, phone and name are removed first, so Meta cannot tell who made them. Your ad results will look far worse than they are.', 'bricks-meta-events' );
 
 			// A failed fetch and a deliberate opt-out produce an identical
 			// disabled settings object. The absence of the cache entry is the
@@ -113,8 +113,8 @@ class Diagnostics {
 					'aam',
 					self::ERROR,
 					$label,
-					$message . ' ' . __( 'Meta pixel for WordPress has also never successfully retrieved these settings from Meta, so this may be a connectivity problem rather than a deliberate setting.', 'bricks-meta-events' ),
-					__( 'Check that this site can reach graph.facebook.com, then reload. If it can, enable automatic advanced matching for this pixel in Meta Events Manager.', 'bricks-meta-events' )
+					$message . ' ' . __( 'Meta pixel for WordPress has also never managed to fetch these settings, so this may be a connection problem rather than a choice.', 'bricks-meta-events' ),
+					__( 'Check this site can reach Meta, then reload. If it can, switch on automatic advanced matching for this pixel in Meta Events Manager.', 'bricks-meta-events' )
 				);
 			}
 
@@ -123,7 +123,7 @@ class Diagnostics {
 				self::ERROR,
 				$label,
 				$message,
-				__( 'Enable automatic advanced matching for this pixel in Meta Events Manager, then reload this page.', 'bricks-meta-events' )
+				__( 'Switch on automatic advanced matching for this pixel in Meta Events Manager, then reload this page.', 'bricks-meta-events' )
 			);
 		}
 
@@ -140,10 +140,10 @@ class Diagnostics {
 				$label,
 				sprintf(
 					/* translators: %s: comma-separated list of field names. */
-					__( 'Advanced matching is on, but these identifiers are excluded and will be dropped: %s.', 'bricks-meta-events' ),
+					__( 'Matching is on, but these are being left out and will not be sent: %s.', 'bricks-meta-events' ),
 					implode( ', ', array_map( array( self::class, 'field_name' ), $missing ) )
 				),
-				__( 'Enable the missing fields in your Meta Events Manager pixel settings if you want them used for attribution.', 'bricks-meta-events' )
+				__( 'Switch the missing ones on in your Meta Events Manager pixel settings.', 'bricks-meta-events' )
 			);
 		}
 
@@ -153,7 +153,7 @@ class Diagnostics {
 			$label,
 			sprintf(
 				/* translators: %d: number of enabled matching fields. */
-				__( 'On, with %d identifier fields enabled including email and phone.', 'bricks-meta-events' ),
+				__( 'On, matching on %d details including email and phone.', 'bricks-meta-events' ),
 				count( $enabled )
 			),
 			''
@@ -174,7 +174,7 @@ class Diagnostics {
 				'current_user',
 				self::OK,
 				$label,
-				__( 'Your account is not treated as internal, so your test submissions will be tracked.', 'bricks-meta-events' ),
+				__( 'Your account is not excluded, so your own test will be tracked.', 'bricks-meta-events' ),
 				''
 			);
 		}
@@ -188,10 +188,10 @@ class Diagnostics {
 			$label,
 			sprintf(
 				/* translators: %s: comma-separated role names. */
-				__( 'You are logged in as: %s. Meta pixel for WordPress discards events from anyone who can edit posts or upload files, so nothing you submit yourself will reach Meta.', 'bricks-meta-events' ),
+				__( 'You are signed in as %s. Meta pixel for WordPress throws away anything sent by people who can edit posts or upload files, so your own test will not reach Meta.', 'bricks-meta-events' ),
 				$roles
 			),
-			__( 'Test in a private window while logged out, or as a Subscriber. This is enforced inside the host plugin and cannot be filtered.', 'bricks-meta-events' )
+			__( 'Test in a private window while signed out, or as a Subscriber. This is built into Meta pixel for WordPress and cannot be changed.', 'bricks-meta-events' )
 		);
 	}
 
@@ -225,17 +225,17 @@ class Diagnostics {
 			self::row(
 				'roles',
 				empty( $unexpected ) ? self::INFO : self::WARNING,
-				__( 'Roles excluded from tracking', 'bricks-meta-events' ),
+				__( 'People who will not be tracked', 'bricks-meta-events' ),
 				sprintf(
 					/* translators: %s: comma-separated role names. */
-					__( 'These roles can edit posts or upload files, so their conversions are discarded: %s.', 'bricks-meta-events' ),
+					__( 'Anyone with these roles can edit posts or upload files, so nothing they do is tracked: %s.', 'bricks-meta-events' ),
 					implode( ', ', $hit )
 				),
 				empty( $unexpected )
 					? ''
 					: sprintf(
 						/* translators: %s: comma-separated role names. */
-						__( 'Check that these are staff-only: %s. If any is a customer or member role, every conversion from those users is being thrown away.', 'bricks-meta-events' ),
+						__( 'Check these are staff only: %s. If any of them is a customer or member role, everything those people do is being thrown away.', 'bricks-meta-events' ),
 						implode( ', ', $unexpected )
 					)
 			),
@@ -269,11 +269,11 @@ class Diagnostics {
 				__( 'Site address mismatch', 'bricks-meta-events' ),
 				sprintf(
 					/* translators: 1: WordPress address host, 2: site address host. */
-					__( 'WordPress Address is %1$s but Site Address is %2$s. Conversions API events are POSTed to the WordPress Address, so they are being sent to %1$s rather than to this site.', 'bricks-meta-events' ),
+					__( 'WordPress Address is %1$s but Site Address is %2$s. Conversions are sent to the WordPress Address, so they are going to %1$s instead of this site.', 'bricks-meta-events' ),
 					$siteurl,
 					$home
 				),
-				__( 'Expected on a local or staging copy of a live site, where server-side tracking cannot be tested. On a production site, correct WordPress Address under Settings → General.', 'bricks-meta-events' )
+				__( 'Normal on a local or staging copy of a live site, where this cannot be tested. On a live site, correct WordPress Address under Settings, General.', 'bricks-meta-events' )
 			),
 		);
 	}
@@ -289,8 +289,8 @@ class Diagnostics {
 				'pixel_id',
 				self::ERROR,
 				__( 'Pixel ID', 'bricks-meta-events' ),
-				__( 'No pixel ID is configured, so the host plugin renders no pixel and this plugin has nothing to attach events to.', 'bricks-meta-events' ),
-				__( 'Add your pixel ID under Settings → Meta.', 'bricks-meta-events' )
+				__( 'No pixel is set up, so nothing can be tracked.', 'bricks-meta-events' ),
+				__( 'Add your pixel under Settings, Meta.', 'bricks-meta-events' )
 			);
 		}
 
@@ -311,37 +311,37 @@ class Diagnostics {
 	 * redirect resilience that is most of the point.
 	 */
 	private static function check_access_token(): array {
-		$label = __( 'Conversions API access token', 'bricks-meta-events' );
+		$label = __( 'Sending from your site', 'bricks-meta-events' );
 
 		if ( ! Host_Adapter::has_access_token() ) {
 			return self::row(
 				'access_token',
 				self::WARNING,
 				$label,
-				__( 'No access token found. Server-side events cannot be sent, so tracking falls back to the browser pixel alone and will be lost to ad blockers and to form redirects.', 'bricks-meta-events' ),
-				__( 'Add a Conversions API access token under Settings → Meta.', 'bricks-meta-events' )
+				__( 'Not set up. Everything will be sent from the visitor\'s browser instead, where ad blockers and page redirects can lose it.', 'bricks-meta-events' ),
+				__( 'Connect the Conversions API under Settings, Meta.', 'bricks-meta-events' )
 			);
 		}
 
-		return self::row( 'access_token', self::OK, $label, __( 'Present.', 'bricks-meta-events' ), '' );
+		return self::row( 'access_token', self::OK, $label, __( 'Set up.', 'bricks-meta-events' ), '' );
 	}
 
 	/**
 	 * Has the host plugin tripped its own circuit breaker?
 	 */
 	private static function check_circuit_breaker(): array {
-		$label = __( 'Conversions API circuit breaker', 'bricks-meta-events' );
+		$label = __( 'Sending paused', 'bricks-meta-events' );
 
 		if ( Host_Adapter::circuit_breaker_ok() ) {
-			return self::row( 'circuit_breaker', self::OK, $label, __( 'Closed, sends are allowed.', 'bricks-meta-events' ), '' );
+			return self::row( 'circuit_breaker', self::OK, $label, __( 'No, sending is working normally.', 'bricks-meta-events' ), '' );
 		}
 
 		return self::row(
 			'circuit_breaker',
 			self::ERROR,
 			$label,
-			__( 'Tripped. The host plugin has stopped sending server events after repeated failures, and will keep refusing until it resets.', 'bricks-meta-events' ),
-			__( 'Use "Send test event" below to see the underlying Graph API error.', 'bricks-meta-events' )
+			__( 'Yes. Meta pixel for WordPress stopped sending after repeated failures and will not try again until it resets.', 'bricks-meta-events' ),
+			__( 'Use Send a test event below to see what Meta is reporting.', 'bricks-meta-events' )
 		);
 	}
 
@@ -356,8 +356,8 @@ class Diagnostics {
 				self::row(
 					'probes',
 					self::OK,
-					__( 'Host plugin compatibility', 'bricks-meta-events' ),
-					__( 'All internal interfaces this plugin depends on are present and unchanged.', 'bricks-meta-events' ),
+					__( 'Meta plugin compatibility', 'bricks-meta-events' ),
+					__( 'Everything this plugin relies on is present and unchanged.', 'bricks-meta-events' ),
 					''
 				),
 			);
@@ -367,13 +367,13 @@ class Diagnostics {
 			self::row(
 				'probes',
 				self::ERROR,
-				__( 'Host plugin compatibility', 'bricks-meta-events' ),
+				__( 'Meta plugin compatibility', 'bricks-meta-events' ),
 				sprintf(
 					/* translators: %s: comma-separated probe names. */
-					__( 'Meta pixel for WordPress has changed in a way this plugin does not recognise. Failing checks: %s.', 'bricks-meta-events' ),
+					__( 'Meta pixel for WordPress has changed in a way this plugin does not recognise: %s.', 'bricks-meta-events' ),
 					implode( '; ', $failing )
 				),
-				__( 'Server-side events are disabled until this is resolved. Roll the host plugin back to a known-good version, or update this plugin.', 'bricks-meta-events' )
+				__( 'Sending from your site is switched off until this is sorted. Roll Meta pixel for WordPress back to a version that worked, or update this plugin.', 'bricks-meta-events' )
 			),
 		);
 	}
@@ -447,7 +447,7 @@ class Diagnostics {
 				'status'  => self::ERROR,
 				'message' => sprintf(
 					/* translators: 1: target URL, 2: error message. */
-					__( 'Could not reach %1$s: %2$s. Conversions API events are delivered through this endpoint, so they are silently failing.', 'bricks-meta-events' ),
+					__( 'Could not reach %1$s: %2$s. Conversions are normally sent through this address in the background, so they would be lost.', 'bricks-meta-events' ),
 					$target,
 					$response->get_error_message()
 				),
@@ -456,10 +456,9 @@ class Diagnostics {
 			$result = array(
 				'status'  => self::OK,
 				'message' => sprintf(
-					/* translators: 1: target URL, 2: HTTP status code. */
-					__( 'Reached %1$s (HTTP %2$d). Conversions API delivery is not being blocked at the network layer.', 'bricks-meta-events' ),
-					$target,
-					wp_remote_retrieve_response_code( $response )
+					/* translators: %s: target URL. */
+					__( 'Reached %s. Background sending is not being blocked.', 'bricks-meta-events' ),
+					$target
 				),
 			);
 		}

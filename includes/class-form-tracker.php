@@ -145,7 +145,8 @@ class Form_Tracker {
 			self::log( 'Form ' . $form->get_id() . ': ' . $note );
 		}
 
-		$event = self::build_event( $event_name, $identity, $label, $form );
+		$custom = self::custom_data( $settings, $label );
+		$event  = self::build_event( $event_name, array_merge( $identity, $custom ), $form );
 
 		if ( null !== $event && self::MODE_BROWSER !== $mode ) {
 			self::dispatch( $event );
@@ -153,7 +154,7 @@ class Form_Tracker {
 		}
 
 		if ( self::MODE_SERVER !== $mode ) {
-			$response['bme_event'] = self::browser_payload( $event, $event_name, $label );
+			$response['bme_event'] = self::browser_payload( $event, $event_name, $custom );
 		}
 
 		return $response;
@@ -201,16 +202,44 @@ class Form_Tracker {
 	}
 
 	/**
+	 * The non-identity values that describe this conversion.
+	 *
+	 * These keys are the ones the host plugin's factory actually passes on.
+	 * Anything else it computes and then discards, so extra properties have to
+	 * be set on the event directly.
+	 *
+	 * @param array  $settings Bricks element settings.
+	 * @param string $label    Resolved content_name.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function custom_data( array $settings, string $label ): array {
+		$custom = array( 'content_name' => $label );
+
+		$value = isset( $settings['bmeValue'] ) ? (float) $settings['bmeValue'] : 0.0;
+
+		// A zero value is dropped by the factory's own empty() guard, so there
+		// is nothing to gain by passing it through.
+		if ( $value > 0 ) {
+			$currency = trim( (string) ( $settings['bmeCurrency'] ?? '' ) );
+
+			$custom['value']    = $value;
+			$custom['currency'] = '' !== $currency ? strtoupper( $currency ) : Element_Controls::default_currency();
+		}
+
+		return $custom;
+	}
+
+	/**
 	 * Build the Event, or null when the host plugin cannot be used.
 	 *
 	 * @param string $event_name Meta event name.
-	 * @param array  $identity   Hashable identity values.
-	 * @param string $label      Resolved content_name.
+	 * @param array  $payload    Identity plus custom data for the factory.
 	 * @param object $form       Bricks form object.
 	 *
 	 * @return object|null
 	 */
-	private static function build_event( string $event_name, array $identity, string $label, $form ) {
+	private static function build_event( string $event_name, array $payload, $form ) {
 		if ( ! Host_Adapter::can_send_server_events() ) {
 			self::log( 'Host plugin compatibility probes failing; browser-only fallback.' );
 
@@ -220,7 +249,7 @@ class Form_Tracker {
 		$event = call_user_func(
 			array( Host_Adapter::CLS_EVENT_FACTORY, 'safe_create_event' ),
 			$event_name,
-			static fn() => array_merge( $identity, array( 'content_name' => $label ) ),
+			static fn() => $payload,
 			array(),
 			Plugin::INTEGRATION_NAME,
 			false
@@ -246,11 +275,11 @@ class Form_Tracker {
 	 *
 	 * @param object|null $event      Event object, when one was built.
 	 * @param string      $event_name Meta event name.
-	 * @param string      $label      Resolved content_name.
+	 * @param array       $custom     Custom data shared with the server event.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private static function browser_payload( $event, string $event_name, string $label ): array {
+	private static function browser_payload( $event, string $event_name, array $custom ): array {
 		$event_id = is_object( $event ) && method_exists( $event, 'getEventId' )
 			? (string) $event->getEventId()
 			: wp_generate_uuid4();
@@ -262,9 +291,9 @@ class Form_Tracker {
 			// list; hardcoding 'track' would silently drop custom events.
 			'method'   => Event_Map::is_standard( $event_name ) ? 'track' : 'trackCustom',
 			'custom'   => array_filter(
-				array(
-					'content_name'            => $label,
-					'fb_integration_tracking' => Plugin::INTEGRATION_NAME,
+				array_merge(
+					$custom,
+					array( 'fb_integration_tracking' => Plugin::INTEGRATION_NAME )
 				)
 			),
 		);

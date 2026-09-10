@@ -4,11 +4,11 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Server-verified Meta conversion events for Bricks Builder forms, deduplicated against the browser pixel.
+Tracks Bricks form submissions in Meta, sent from your site and the visitor's browser and counted only once.
 
 == Description ==
 
@@ -23,6 +23,12 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.3.0 =
+* Plain English throughout the settings screen and the form panel, with the jargon taken out.
+* Each option now shows the event Meta will record beside it, so you can see what you will get in Events Manager before you save.
+* Added a value and currency per form, so Meta can work out what your ads earn you.
+* The background sending check now runs when the plugin is switched on and again every day. It used to wait until someone opened the settings screen, and until then a site that blocks background sending lost every conversion with no warning.
 
 = 0.2.0 =
 * Added the browser pixel event, sharing an event ID with the Conversions API event so Meta deduplicates the pair rather than counting two conversions.

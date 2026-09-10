@@ -123,7 +123,7 @@ class Field_Mapper {
 			// person's hashed email to Meta, so send neither.
 			$this->notes[] = sprintf(
 				/* translators: %d: number of email fields. */
-				__( 'This form has %d email fields with different values, so no email was sent. Set an email field override to choose one.', 'bricks-meta-events' ),
+				__( 'This form has %d email fields with different addresses, so no email was sent. Pick one using the Email field setting.', 'bricks-meta-events' ),
 				count( $typed )
 			);
 
@@ -143,7 +143,7 @@ class Field_Mapper {
 		if ( 1 === count( $inferred ) ) {
 			$this->notes[] = sprintf(
 				/* translators: %s: field label. */
-				__( 'No email field found, so the email was inferred from the text field "%s". Set the field type to Email, or add an override, to make this explicit.', 'bricks-meta-events' ),
+				__( 'No email field found, so the address was taken from the text field "%s". Change that field to the Email type to be sure.', 'bricks-meta-events' ),
 				$inferred[0]['label']
 			);
 
@@ -247,7 +247,7 @@ class Field_Mapper {
 		if ( null === $field ) {
 			$this->notes[] = sprintf(
 				/* translators: %s: the override value the author typed. */
-				__( 'Field override "%s" does not match any field on this form, so that identity was not sent.', 'bricks-meta-events' ),
+				__( 'The field "%s" is not on this form, so that detail was not sent.', 'bricks-meta-events' ),
 				$override
 			);
 

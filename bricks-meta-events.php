@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       Bricks Meta Events
- * Description:       Sends server-verified Meta conversion events for Bricks Builder forms, deduplicated against the browser pixel. Inherits all credentials from Meta pixel for WordPress.
- * Version:           0.2.0
+ * Description:       Tracks Bricks form submissions in Meta. Each one is sent from your site and from the visitor's browser, and counted only once. Uses your existing Meta pixel for WordPress setup, so there is nothing extra to configure.
+ * Version:           0.3.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Requires Plugins:  official-facebook-pixel
@@ -18,7 +18,7 @@ namespace BricksMetaEvents;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const FILE    = __FILE__;
 const DIR     = __DIR__;
 
@@ -57,3 +57,6 @@ add_action(
 	// Late, so the host plugin has registered its classes and options.
 	20
 );
+
+register_activation_hook( FILE, array( __NAMESPACE__ . '\\Plugin', 'on_activate' ) );
+register_deactivation_hook( FILE, array( __NAMESPACE__ . '\\Plugin', 'on_deactivate' ) );

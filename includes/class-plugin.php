@@ -40,6 +40,33 @@ class Plugin {
 	}
 
 	/**
+	 * Run the checks a fresh install depends on.
+	 *
+	 * The background-sending check in particular has to happen before the
+	 * first conversion, not after someone opens the health screen. Until it
+	 * has run, the plugin assumes the background route works, which is the
+	 * wrong assumption to make silently.
+	 */
+	public static function on_activate(): void {
+		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::CRON_HOOK );
+		}
+
+		Diagnostics::loopback( true );
+	}
+
+	/**
+	 * Clear our scheduled check when the plugin is switched off.
+	 */
+	public static function on_deactivate(): void {
+		$timestamp = wp_next_scheduled( self::CRON_HOOK );
+
+		if ( $timestamp ) {
+			wp_unschedule_event( $timestamp, self::CRON_HOOK );
+		}
+	}
+
+	/**
 	 * Register hooks.
 	 */
 	public function boot(): void {
@@ -113,6 +140,12 @@ class Plugin {
 	 * Record whether advanced matching is currently active.
 	 */
 	public function run_scheduled_check(): void {
+		// Refresh the background-sending check too. Whether it works decides
+		// how conversions are sent, and if it has never been checked the
+		// plugin assumes the background route works and quietly loses every
+		// conversion on a site where it does not.
+		Diagnostics::loopback( true );
+
 		$settings = Host_Adapter::aam_settings();
 
 		$enabled = null !== $settings
@@ -165,12 +198,12 @@ class Plugin {
 			esc_html(
 				sprintf(
 					/* translators: %s: comma-separated list of failing check names. */
-					__( 'conversion tracking is not working correctly: %s.', 'bricks-meta-events' ),
+					__( 'conversion tracking is not working properly: %s.', 'bricks-meta-events' ),
 					implode( ', ', $problems )
 				)
 			),
 			esc_url( admin_url( 'options-general.php?page=bricks-meta-events' ) ),
-			esc_html__( 'View diagnostics', 'bricks-meta-events' )
+			esc_html__( 'See what is wrong', 'bricks-meta-events' )
 		);
 	}
 }

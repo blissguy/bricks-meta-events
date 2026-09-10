@@ -28,7 +28,7 @@ class Health_Screen {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Bricks Meta Events', 'bricks-meta-events' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'This plugin has no settings of its own. Pixel ID, access token and advanced matching all come from Meta pixel for WordPress.', 'bricks-meta-events' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'This plugin has no settings of its own. Your pixel, connection and matching settings all come from Meta pixel for WordPress.', 'bricks-meta-events' ) . '</p>';
 
 		if ( '' !== $notice ) {
 			echo wp_kses_post( $notice );
@@ -112,7 +112,7 @@ class Health_Screen {
 		$last = get_option( Plugin::OPTION_LAST_EVENT );
 
 		if ( ! is_array( $last ) || empty( $last['event'] ) ) {
-			echo '<p>' . esc_html__( 'Nothing yet. Submit a tracked Bricks form while logged out to see it here.', 'bricks-meta-events' ) . '</p>';
+			echo '<p>' . esc_html__( 'Nothing yet. Send a tracked form while signed out and it will show up here.', 'bricks-meta-events' ) . '</p>';
 
 			return;
 		}
@@ -120,8 +120,8 @@ class Health_Screen {
 		$outcomes = array(
 			'accepted'   => array( Diagnostics::OK, __( 'Accepted by Meta', 'bricks-meta-events' ) ),
 			'rejected'   => array( Diagnostics::ERROR, __( 'Rejected by Meta', 'bricks-meta-events' ) ),
-			'held'       => array( Diagnostics::WARNING, __( 'Held pending consent, not sent', 'bricks-meta-events' ) ),
-			'handed_off' => array( Diagnostics::INFO, __( 'Handed to background delivery, outcome unknown', 'bricks-meta-events' ) ),
+			'held'       => array( Diagnostics::WARNING, __( 'Waiting for cookie consent, not sent', 'bricks-meta-events' ) ),
+			'handed_off' => array( Diagnostics::INFO, __( 'Sent in the background, result not known', 'bricks-meta-events' ) ),
 		);
 
 		[ $status, $outcome_label ] = $outcomes[ $last['outcome'] ?? 'handed_off' ] ?? $outcomes['handed_off'];
@@ -129,20 +129,20 @@ class Health_Screen {
 		$rows = array(
 			__( 'Event', 'bricks-meta-events' )    => $last['event'],
 			__( 'Name in Events Manager', 'bricks-meta-events' ) => $last['label'] ?? '',
-			__( 'Outcome', 'bricks-meta-events' )  => $outcome_label,
+			__( 'Result', 'bricks-meta-events' )  => $outcome_label,
 			__( 'When', 'bricks-meta-events' )     => sprintf(
 				/* translators: %s: human-readable time difference. */
 				__( '%s ago', 'bricks-meta-events' ),
 				human_time_diff( (int) $last['time'] )
 			),
 			__( 'Event ID', 'bricks-meta-events' ) => $last['event_id'],
-			__( 'Source URL', 'bricks-meta-events' ) => $last['source'],
+			__( 'Page', 'bricks-meta-events' ) => $last['source'],
 			__( 'Delivery', 'bricks-meta-events' ) => 'inline' === ( $last['mode'] ?? '' )
-				? __( 'Inline (loopback unavailable)', 'bricks-meta-events' )
-				: __( 'Background', 'bricks-meta-events' ),
-			__( 'Identity sent', 'bricks-meta-events' ) => ! empty( $last['matched'] )
+				? __( 'While the form was submitting', 'bricks-meta-events' )
+				: __( 'In the background', 'bricks-meta-events' ),
+			__( 'Customer details sent', 'bricks-meta-events' ) => ! empty( $last['matched'] )
 				? implode( ', ', (array) $last['matched'] )
-				: __( 'None. Every identifier was stripped, so Meta cannot attribute this conversion.', 'bricks-meta-events' ),
+				: __( 'None. Everything was removed before sending, so Meta cannot tell who this was.', 'bricks-meta-events' ),
 		);
 
 		printf( '<p>%s <strong>%s</strong></p>', wp_kses_post( self::status_icon( $status ) ), esc_html( $outcome_label ) );
@@ -172,8 +172,8 @@ class Health_Screen {
 	private static function render_loopback(): void {
 		$result = Diagnostics::loopback();
 
-		echo '<h2>' . esc_html__( 'Loopback delivery', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Conversions API events are delivered through a non-blocking request from WordPress to its own admin-ajax.php. Security plugins routinely block this, and when they do the events disappear with no error.', 'bricks-meta-events' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Background sending', 'bricks-meta-events' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Conversions are normally sent in the background, by your site quietly calling its own address. Security plugins often block that, and when they do the conversions disappear with no warning.', 'bricks-meta-events' ) . '</p>';
 
 		printf(
 			'<p>%s %s</p>',
@@ -184,11 +184,11 @@ class Health_Screen {
 		if ( Diagnostics::ERROR === $result['status'] ) {
 			printf(
 				'<p><em>%s</em></p>',
-				esc_html__( 'Because of this, conversion events are being sent inline during form submission rather than in the background. Nothing is lost, but submitting a form costs one extra round trip to Meta. Fixing the loopback restores background delivery automatically.', 'bricks-meta-events' )
+				esc_html__( 'Because of this, conversions are being sent while the form is submitting instead of in the background. Nothing is lost, but sending takes a moment longer. Fix the block and background sending starts again on its own.', 'bricks-meta-events' )
 			);
 		}
 
-		self::form( 'loopback', __( 'Re-test loopback', 'bricks-meta-events' ) );
+		self::form( 'loopback', __( 'Check again', 'bricks-meta-events' ) );
 	}
 
 	/**
@@ -196,11 +196,11 @@ class Health_Screen {
 	 */
 	private static function render_test_event(): void {
 		echo '<h2>' . esc_html__( 'Send a test event', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Sends a Lead event to the Conversions API synchronously and prints the raw response from Meta. Unlike normal delivery this bypasses the background loopback, so it verifies your access token and shows exactly which identity fields survived advanced matching.', 'bricks-meta-events' ) . '</p>';
-		echo '<p>' . esc_html__( 'Paste a test event code from Events Manager → Test Events to have it appear there rather than in your live data.', 'bricks-meta-events' ) . '</p>';
+		echo '<p>' . esc_html__( 'Sends a real Lead to Meta straight away and shows exactly what came back. This skips background sending, so it confirms your connection works and shows which customer details actually got through.', 'bricks-meta-events' ) . '</p>';
+		echo '<p>' . esc_html__( 'Paste a test event code from Events Manager, Test Events, so it shows up there instead of in your real data.', 'bricks-meta-events' ) . '</p>';
 
 		if ( ! Host_Adapter::can_send_server_events() ) {
-			echo '<p><em>' . esc_html__( 'Unavailable: the host plugin compatibility check above is failing.', 'bricks-meta-events' ) . '</em></p>';
+			echo '<p><em>' . esc_html__( 'Not available while the compatibility check above is failing.', 'bricks-meta-events' ) . '</em></p>';
 
 			return;
 		}
@@ -252,7 +252,7 @@ class Health_Screen {
 		} catch ( \Throwable $e ) {
 			return sprintf(
 				'<div class="notice notice-error"><p><strong>%s</strong></p><pre>%s</pre></div>',
-				esc_html__( 'The test event threw an exception:', 'bricks-meta-events' ),
+				esc_html__( 'The test could not run:', 'bricks-meta-events' ),
 				esc_html( $e->getMessage() )
 			);
 		}
@@ -261,7 +261,7 @@ class Health_Screen {
 		if ( null === $response ) {
 			return sprintf(
 				'<div class="notice notice-warning"><p>%s</p></div>',
-				esc_html__( 'The host plugin queued this event instead of sending it, which means signals are currently held pending consent. Nothing was sent to Meta.', 'bricks-meta-events' )
+				esc_html__( 'Meta pixel for WordPress held this back instead of sending it, because cookie consent has not been given. Nothing reached Meta.', 'bricks-meta-events' )
 			);
 		}
 
@@ -311,12 +311,12 @@ class Health_Screen {
 		}
 
 		if ( empty( $present ) ) {
-			return __( 'No identity fields survived: every hashed identifier was stripped before sending. Meta received this conversion with nothing to attribute it to. See the advanced matching check above.', 'bricks-meta-events' );
+			return __( 'No customer details got through. Meta received this with nothing to identify the person by. See the customer matching check above.', 'bricks-meta-events' );
 		}
 
 		return sprintf(
 			/* translators: %s: comma-separated field names. */
-			__( 'Identity fields sent (hashed): %s.', 'bricks-meta-events' ),
+			__( 'Customer details sent, encrypted: %s.', 'bricks-meta-events' ),
 			implode( ', ', $present )
 		);
 	}

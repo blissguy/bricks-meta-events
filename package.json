@@ -1,7 +1,7 @@
 {
   "name": "bricks-meta-events",
-  "version": "0.2.0",
-  "description": "Server-verified Meta conversion events for Bricks Builder forms, deduplicated against the browser pixel.",
+  "version": "0.3.0",
+  "description": "Tracks Bricks form submissions in Meta, sent from your site and the visitor's browser and counted only once.",
   "private": true,
   "license": "GPL-2.0-or-later",
   "repository": {
