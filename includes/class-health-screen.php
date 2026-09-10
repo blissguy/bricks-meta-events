@@ -180,7 +180,10 @@ class Health_Screen {
 
 		echo '</tbody></table>';
 
-		if ( ! empty( $last['response'] ) ) {
+		// On success the result row above already says everything useful. The
+		// raw reply is only worth showing when it explains a refusal.
+		if ( 'rejected' === ( $last['outcome'] ?? '' ) && ! empty( $last['response'] ) ) {
+			echo '<p>' . esc_html__( 'What Meta sent back:', 'bricks-meta-events' ) . '</p>';
 			printf(
 				'<pre style="white-space:pre-wrap;max-height:14em;overflow:auto">%s</pre>',
 				esc_html( wp_json_encode( $last['response'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) )
@@ -239,11 +242,17 @@ class Health_Screen {
 	private static function render_log(): void {
 		$log = Event_Log::all();
 
-		if ( count( $log ) < 2 ) {
+		if ( empty( $log ) ) {
 			return;
 		}
 
 		echo '<h2>' . esc_html__( 'Earlier conversions', 'bricks-meta-events' ) . '</h2>';
+
+		if ( count( $log ) < 2 ) {
+			echo '<p>' . esc_html__( 'Nothing earlier yet. Once you have sent more than one, the last fifty are listed here.', 'bricks-meta-events' ) . '</p>';
+
+			return;
+		}
 		echo '<table class="widefat striped"><thead><tr>';
 
 		foreach (
