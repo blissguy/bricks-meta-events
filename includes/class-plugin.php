@@ -17,6 +17,7 @@ class Plugin {
 	public const CRON_HOOK       = 'bme_daily_health_check';
 	public const OPTION_AAM_LAST   = 'bme_aam_last_status';
 	public const OPTION_LAST_EVENT = 'bme_last_event';
+	public const OPTION_BACKGROUND_BROKEN = 'bme_background_broken';
 
 	/**
 	 * Identifies this plugin's events to the host plugin and to Meta.

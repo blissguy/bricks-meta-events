@@ -465,6 +465,13 @@ class Diagnostics {
 
 		set_transient( self::LOOPBACK_TRANSIENT, $result, HOUR_IN_SECONDS );
 
+		// A passing check clears the sticky "background sending is broken"
+		// finding, so a site that gets fixed goes back to background sending
+		// on its own rather than staying on the slower inline route forever.
+		if ( self::OK === $result['status'] ) {
+			delete_option( Plugin::OPTION_BACKGROUND_BROKEN );
+		}
+
 		return $result;
 	}
 

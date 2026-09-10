@@ -117,14 +117,7 @@ class Health_Screen {
 			return;
 		}
 
-		$outcomes = array(
-			'accepted'   => array( Diagnostics::OK, __( 'Accepted by Meta', 'bricks-meta-events' ) ),
-			'rejected'   => array( Diagnostics::ERROR, __( 'Rejected by Meta', 'bricks-meta-events' ) ),
-			'held'       => array( Diagnostics::WARNING, __( 'Waiting for cookie consent, not sent', 'bricks-meta-events' ) ),
-			'handed_off' => array( Diagnostics::INFO, __( 'Sent in the background, result not known', 'bricks-meta-events' ) ),
-		);
-
-		[ $status, $outcome_label ] = $outcomes[ $last['outcome'] ?? 'handed_off' ] ?? $outcomes['handed_off'];
+		[ $status, $outcome_label ] = self::resolve_outcome( $last );
 
 		$rows = array(
 			__( 'Event', 'bricks-meta-events' )    => $last['event'],
@@ -164,6 +157,48 @@ class Health_Screen {
 				esc_html( wp_json_encode( $last['response'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) )
 			);
 		}
+	}
+
+	/**
+	 * Turn a stored conversion into a status and a plain answer.
+	 *
+	 * Background sending happens in a separate request, so the conversion is
+	 * handed over and then goes quiet. A conversion that was handed over a
+	 * while ago and never went out is not an unknown, it is a failure, and
+	 * saying so is the whole point of this panel.
+	 *
+	 * @param array $last Stored conversion record.
+	 *
+	 * @return array{0: string, 1: string}
+	 */
+	private static function resolve_outcome( array $last ): array {
+		$outcome = $last['outcome'] ?? 'handed_off';
+
+		if ( 'accepted' === $outcome ) {
+			return array( Diagnostics::OK, __( 'Accepted by Meta', 'bricks-meta-events' ) );
+		}
+
+		if ( 'rejected' === $outcome ) {
+			return array( Diagnostics::ERROR, __( 'Rejected by Meta', 'bricks-meta-events' ) );
+		}
+
+		if ( 'held' === $outcome ) {
+			return array( Diagnostics::WARNING, __( 'Waiting for cookie consent, not sent', 'bricks-meta-events' ) );
+		}
+
+		if ( ! empty( $last['delivered_at'] ) ) {
+			return array( Diagnostics::OK, __( 'Sent in the background and confirmed on its way to Meta', 'bricks-meta-events' ) );
+		}
+
+		// Long enough that a working background send would have reported in.
+		if ( time() - (int) ( $last['time'] ?? 0 ) > 2 * MINUTE_IN_SECONDS ) {
+			return array(
+				Diagnostics::ERROR,
+				__( 'Handed over for background sending but it never went out, so Meta did not receive it. Background sending is being blocked on this site.', 'bricks-meta-events' ),
+			);
+		}
+
+		return array( Diagnostics::INFO, __( 'Just handed over for background sending. Reload in a minute to see whether it went out.', 'bricks-meta-events' ) );
 	}
 
 	/**

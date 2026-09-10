@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
 
 == Changelog ==
+
+= 0.4.0 =
+* Background sending is now confirmed rather than assumed. A conversion that is handed over and never goes out is reported as a failure, instead of sitting at "result not known" forever.
+* When background sending turns out to be blocked, the plugin starts sending while the form submits instead, and goes back to background sending on its own once the check passes again.
 
 = 0.3.0 =
 * Plain English throughout the settings screen and the form panel, with the jargon taken out.

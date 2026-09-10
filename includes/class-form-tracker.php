@@ -41,6 +41,49 @@ class Form_Tracker {
 	public static function register(): void {
 		add_filter( 'bricks/form/response', array( self::class, 'on_response' ), 10, 2 );
 		add_action( 'bricks/form/custom_action', array( self::class, 'ensure_response_filter_runs' ), 99 );
+		add_filter( 'before_conversions_api_event_sent', array( self::class, 'note_delivery' ), 5 );
+	}
+
+	/**
+	 * Note that a conversion actually reached the point of being sent.
+	 *
+	 * Background delivery happens in a second, separate request that this one
+	 * cannot see the result of, and the Meta plugin offers no hook for after a
+	 * send. This filter, though, runs inside that second request. If it never
+	 * fires for a conversion we handed over, the second request never happened
+	 * and the conversion was lost, which is the difference between "we do not
+	 * know" and "it is broken".
+	 *
+	 * @param array $events Events about to be sent.
+	 *
+	 * @return array Unchanged.
+	 */
+	public static function note_delivery( $events ) {
+		if ( ! is_array( $events ) ) {
+			return $events;
+		}
+
+		$last = get_option( Plugin::OPTION_LAST_EVENT );
+
+		if ( ! is_array( $last ) || empty( $last['event_id'] ) || ! empty( $last['delivered_at'] ) ) {
+			return $events;
+		}
+
+		foreach ( $events as $event ) {
+			if ( ! is_object( $event ) || ! method_exists( $event, 'getEventId' ) ) {
+				continue;
+			}
+
+			if ( (string) $event->getEventId() !== (string) $last['event_id'] ) {
+				continue;
+			}
+
+			$last['delivered_at'] = time();
+			update_option( Plugin::OPTION_LAST_EVENT, $last, false );
+			break;
+		}
+
+		return $events;
 	}
 
 	/**
@@ -344,7 +387,8 @@ class Form_Tracker {
 			return false;
 		}
 
-		$broken = Diagnostics::ERROR === Diagnostics::cached_loopback_status();
+		$broken = Diagnostics::ERROR === Diagnostics::cached_loopback_status()
+			|| self::background_sending_is_broken();
 
 		/**
 		 * Filters whether Conversions API events are sent inline.
@@ -352,6 +396,38 @@ class Form_Tracker {
 		 * @param bool $synchronous True to send during the request.
 		 */
 		return (bool) apply_filters( 'bme_send_synchronously', $broken );
+	}
+
+	/**
+	 * Whether background sending has been proven not to work here.
+	 *
+	 * A conversion handed over for background sending that never reported in
+	 * was lost. Rather than lose one on every submission, the finding is
+	 * remembered and sending switches to inline until the background check
+	 * passes again, which clears it.
+	 */
+	private static function background_sending_is_broken(): bool {
+		if ( get_option( Plugin::OPTION_BACKGROUND_BROKEN ) ) {
+			return true;
+		}
+
+		$last = get_option( Plugin::OPTION_LAST_EVENT );
+
+		if ( ! is_array( $last ) || 'handed_off' !== ( $last['outcome'] ?? '' ) ) {
+			return false;
+		}
+
+		if ( ! empty( $last['delivered_at'] ) ) {
+			return false;
+		}
+
+		if ( time() - (int) ( $last['time'] ?? 0 ) <= 2 * MINUTE_IN_SECONDS ) {
+			return false;
+		}
+
+		update_option( Plugin::OPTION_BACKGROUND_BROKEN, time(), false );
+
+		return true;
 	}
 
 	/* ---------------------------------------------------------------------
