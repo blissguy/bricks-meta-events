@@ -93,16 +93,6 @@ From Bricks, wire it without code: select the element, add an **Interaction**, s
 
 Anything outside Meta's standard event list is sent as a custom event automatically. Like all click tracking these are browser only and carry no customer details, because a click is not a confirmed enquiry.
 
-## Updates
-
-Updates arrive on the Plugins screen from this repository's GitHub releases, via [plugin-update-checker](https://github.com/YahnisElsts/plugin-update-checker) vendored in `lib/`.
-
-The release workflow publishes a versioned ZIP built from `.distignore`, and the updater is pointed at that asset specifically. Left to itself it would offer GitHub's own source archive, which unpacks as `bricks-meta-events-main/` and would not activate.
-
-The repository is public, so no credentials are needed. GitHub rate limits anonymous API calls per IP, which shared hosting can occasionally hit; if that happens, define `BME_GITHUB_TOKEN` in `wp-config.php` or filter `bme_github_token`.
-
-**Both ignore files anchor their patterns to the plugin root.** An unanchored `vendor` matches `lib/plugin-update-checker/vendor` too, which strips Parsedown and the readme parser and ships a broken updater. Verified in both files.
-
 ## Site-wide settings
 
 **Settings → Bricks Meta Events → Settings.** Each one is a default that any individual form can override:
@@ -120,9 +110,7 @@ The repository is public, so no credentials are needed. GitHub rate limits anony
 | `bme_send_synchronously` | Force or prevent inline Conversions API delivery. Defaults to inline when the loopback probe has failed, when a handed-over conversion was never confirmed, or when test mode is on. |
 | `bme_enqueue_tracking` | Return false to stop loading the browser tracking script. |
 
-## Status
 
-`0.8.0` — feature complete against the build plan: form tracking, diagnostics, the browser pixel event sharing an `event_id` with the Conversions API event, a recent-conversions log, test mode, site-wide settings, per-element button and link tracking, `bmeTrack()`, and updates from GitHub releases.
 
 ## Licence
 
