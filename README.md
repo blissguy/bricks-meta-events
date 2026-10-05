@@ -55,9 +55,9 @@ Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires 
 Select a form in Bricks, open **Content → Meta tracking**:
 
 - **Track this form** — off by default.
-- **What does submitting this form mean?** — plain-language outcomes ("They become a lead", "They contact us", …) that map to Meta's standard events. Meta's event list is closed, so there is no reason to ask you to type an event name.
-- **Name in Events Manager** — becomes `content_name`. Left on Auto, the first of these that exists is used: the **Form name** under Save submission → the element's name in the structure panel → the submit button text → the page or template title. A value containing unresolved dynamic data is skipped, because `content_name` is a breakdown dimension and a label that varies per page produces hundreds of unusable rows.
-- **Identity matching** — email and phone are detected from field *types*, names from field labels, and a logged-in visitor by account ID. Override by pasting a field's **ID** (Bricks shows it with a copy button on every field); IDs survive reordering and relabelling. Enter `none` to never send that identity.
+- **Event** — plain-language outcomes ("Became a lead (Lead)", "Got in touch (Contact)", …) that map to Meta's standard events. Meta's event list is closed, so there is no reason to ask you to type an event name. A form where nothing has been picked sends the site-wide **Default form event**, which is also what the empty select shows.
+- **Name in Events Manager** — becomes `content_name`. Left blank (the placeholder says Automatic), the first of these that exists is used: the **Form name** under Save submission → the element's name in the structure panel → the submit button text → the page or template title. A value containing unresolved dynamic data is skipped, because `content_name` is a breakdown dimension and a label that varies per page produces hundreds of unusable rows.
+- **Customer details** — email and phone are detected from field *types*, names from field labels, and a logged-in visitor by account ID. Override by pasting a field's **ID** (Bricks shows it with a copy button on every field); IDs survive reordering and relabelling. Enter `none` to never send that identity.
 
 ## Detection rules
 

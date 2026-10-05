@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.9.0
+Stable tag: 0.9.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,12 @@ Meta for WooCommerce or Meta pixel for WordPress, connected to your pixel. This 
 Settings → Bricks Meta Events shows whether everything is connected and lists the last 50 conversions with what happened to each. Test mode sends your form conversions to Events Manager → Test Events instead of your real figures.
 
 == Changelog ==
+
+= 0.9.1 =
+* Shorter, plainer labels in the Meta tracking panel on Bricks forms, buttons and links: Event, Event name, Value, Sending and Customer details.
+* Event options no longer all start with "They". For example, "They become a lead (Lead)" is now "Became a lead (Lead)".
+* Empty dropdowns now show what will be used, such as Automatic, instead of Bricks' "Default".
+* A form where no event has been picked now sends your Default form event from Settings, which is what the panel shows. It used to send Lead whatever that setting said.
 
 = 0.9.0 =
 * Works with Meta for WooCommerce as well as Meta pixel for WordPress. Either one will do, and Meta pixel for WordPress is no longer required.

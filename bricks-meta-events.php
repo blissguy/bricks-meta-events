@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Bricks Meta Events
  * Description:       Sends Bricks form submissions and button clicks to Meta as conversions. No setup of its own: it uses your existing pixel settings.
- * Version:           0.9.0
+ * Version:           0.9.1
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Mixbus Marketing
@@ -18,7 +18,7 @@ namespace BricksMetaEvents;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 const FILE    = __FILE__;
 const DIR     = __DIR__;
 

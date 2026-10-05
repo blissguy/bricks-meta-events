@@ -52,14 +52,14 @@ class Event_Map {
 	 */
 	public static function options(): array {
 		return array(
-			'lead'                 => __( 'They become a lead (Lead)', 'bricks-meta-events' ),
-			'contact'              => __( 'They get in touch (Contact)', 'bricks-meta-events' ),
-			'completeRegistration' => __( 'They create an account (CompleteRegistration)', 'bricks-meta-events' ),
-			'schedule'             => __( 'They book or arrange something (Schedule)', 'bricks-meta-events' ),
-			'submitApplication'    => __( 'They apply for something (SubmitApplication)', 'bricks-meta-events' ),
-			'subscribe'            => __( 'They start a paid plan (Subscribe)', 'bricks-meta-events' ),
-			'startTrial'           => __( 'They start a free trial (StartTrial)', 'bricks-meta-events' ),
-			self::CUSTOM_INTENT    => __( 'Something else', 'bricks-meta-events' ),
+			'lead'                 => __( 'Became a lead (Lead)', 'bricks-meta-events' ),
+			'contact'              => __( 'Got in touch (Contact)', 'bricks-meta-events' ),
+			'completeRegistration' => __( 'Created an account (CompleteRegistration)', 'bricks-meta-events' ),
+			'schedule'             => __( 'Booked something (Schedule)', 'bricks-meta-events' ),
+			'submitApplication'    => __( 'Applied for something (SubmitApplication)', 'bricks-meta-events' ),
+			'subscribe'            => __( 'Started a paid plan (Subscribe)', 'bricks-meta-events' ),
+			'startTrial'           => __( 'Started a free trial (StartTrial)', 'bricks-meta-events' ),
+			self::CUSTOM_INTENT    => __( 'Your own event', 'bricks-meta-events' ),
 		);
 	}
 
@@ -69,7 +69,10 @@ class Event_Map {
 	 * @param array $settings Bricks element settings.
 	 */
 	public static function resolve( array $settings ): string {
-		$intent = $settings['bmeIntent'] ?? self::DEFAULT_INTENT;
+		// Bricks does not save a control's default until someone changes it,
+		// so an untouched form has no intent at all. It has to resolve to the
+		// site-wide default, because that is what the panel shows for it.
+		$intent = $settings['bmeIntent'] ?? Settings::default_intent();
 
 		if ( self::CUSTOM_INTENT === $intent ) {
 			$custom = trim( (string) ( $settings['bmeCustomName'] ?? '' ) );
@@ -107,12 +110,12 @@ class Event_Map {
 	 */
 	public static function click_options(): array {
 		return array(
-			'contact'           => __( 'They get in touch (Contact)', 'bricks-meta-events' ),
-			'lead'              => __( 'They become a lead (Lead)', 'bricks-meta-events' ),
-			'schedule'          => __( 'They book or arrange something (Schedule)', 'bricks-meta-events' ),
-			'viewContent'       => __( 'They open something worth knowing about (ViewContent)', 'bricks-meta-events' ),
-			'submitApplication' => __( 'They start an application (SubmitApplication)', 'bricks-meta-events' ),
-			self::CUSTOM_INTENT => __( 'Something else', 'bricks-meta-events' ),
+			'contact'           => __( 'Got in touch (Contact)', 'bricks-meta-events' ),
+			'lead'              => __( 'Became a lead (Lead)', 'bricks-meta-events' ),
+			'schedule'          => __( 'Booked something (Schedule)', 'bricks-meta-events' ),
+			'viewContent'       => __( 'Opened something important (ViewContent)', 'bricks-meta-events' ),
+			'submitApplication' => __( 'Started an application (SubmitApplication)', 'bricks-meta-events' ),
+			self::CUSTOM_INTENT => __( 'Your own event', 'bricks-meta-events' ),
 		);
 	}
 

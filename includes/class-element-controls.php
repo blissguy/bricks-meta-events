@@ -78,7 +78,7 @@ class Element_Controls {
 		$controls['bmeEnabled'] = array(
 			'tab'   => 'content',
 			'group' => self::GROUP,
-			'label' => esc_html__( 'Track clicks on this', 'bricks-meta-events' ),
+			'label' => esc_html__( 'Track clicks', 'bricks-meta-events' ),
 			'type'  => 'checkbox',
 		);
 
@@ -86,30 +86,33 @@ class Element_Controls {
 			'tab'      => 'content',
 			'group'    => self::GROUP,
 			'type'     => 'info',
-			'content'  => esc_html__( 'A click is not a confirmed enquiry the way a sent form is. Nothing checks that anything came of it, and no customer details go with it, so use this for things like a phone number or a booking link rather than in place of a form.', 'bricks-meta-events' ),
+			'content'  => esc_html__( 'A click isn\'t a confirmed enquiry and carries no customer details. Use it for things like a phone number or booking link, not in place of a form.', 'bricks-meta-events' ),
 			'required' => $enabled,
 		);
 
 		$controls['bmeIntent'] = array(
 			'tab'         => 'content',
 			'group'       => self::GROUP,
-			'label'       => esc_html__( 'What does clicking this mean?', 'bricks-meta-events' ),
+			'label'       => esc_html__( 'Event', 'bricks-meta-events' ),
 			'type'        => 'select',
 			'options'     => Event_Map::click_options(),
 			'default'     => Event_Map::DEFAULT_CLICK_INTENT,
+			// Bricks shows "Default" until an option is picked; show the one
+			// that will actually be sent instead.
+			'placeholder' => Event_Map::click_options()[ Event_Map::DEFAULT_CLICK_INTENT ],
 			'clearable'   => false,
-			'description' => esc_html__( 'The name in brackets is what you will see in Meta Events Manager.', 'bricks-meta-events' ),
+			'description' => esc_html__( 'The name in brackets is what Events Manager shows.', 'bricks-meta-events' ),
 			'required'    => $enabled,
 		);
 
 		$controls['bmeCustomName'] = array(
 			'tab'            => 'content',
 			'group'          => self::GROUP,
-			'label'          => esc_html__( 'Your event name', 'bricks-meta-events' ),
+			'label'          => esc_html__( 'Event name', 'bricks-meta-events' ),
 			'type'           => 'text',
 			'hasDynamicData' => false,
 			'placeholder'    => 'BrochureOpened',
-			'info'           => esc_html__( 'Meta cannot use your own names for most ad goals until they build up plenty of activity. Pick one of the standard options above unless you are sure.', 'bricks-meta-events' ),
+			'info'           => esc_html__( 'Most ad goals can\'t use your own event until it has built up lots of activity. Pick a standard event unless you\'re sure.', 'bricks-meta-events' ),
 			'required'       => array( $enabled, array( 'bmeIntent', '=', Event_Map::CUSTOM_INTENT ) ),
 		);
 
@@ -119,19 +122,19 @@ class Element_Controls {
 			'label'          => esc_html__( 'Name in Events Manager', 'bricks-meta-events' ),
 			'type'           => 'text',
 			'hasDynamicData' => false,
-			'placeholder'    => esc_html__( 'Auto', 'bricks-meta-events' ),
-			'description'    => esc_html__( 'Left on Auto, the text on the button or link is used.', 'bricks-meta-events' ),
+			'placeholder'    => esc_html__( 'Automatic', 'bricks-meta-events' ),
+			'description'    => esc_html__( 'Leave blank to use the button or link text.', 'bricks-meta-events' ),
 			'required'       => $enabled,
 		);
 
 		$controls['bmeValue'] = array(
 			'tab'            => 'content',
 			'group'          => self::GROUP,
-			'label'          => esc_html__( 'What one of these is worth', 'bricks-meta-events' ),
+			'label'          => esc_html__( 'Value', 'bricks-meta-events' ),
 			'type'           => 'number',
 			'min'            => 0,
 			'hasDynamicData' => false,
-			'description'    => esc_html__( 'Leave it blank if you do not know, because a wrong figure is worse than none.', 'bricks-meta-events' ),
+			'description'    => esc_html__( 'What one click is worth to you. Leave blank if you\'re not sure: a wrong figure is worse than none.', 'bricks-meta-events' ),
 			'required'       => $enabled,
 		);
 
@@ -199,23 +202,26 @@ class Element_Controls {
 		$controls['bmeIntent'] = array(
 			'tab'         => 'content',
 			'group'       => self::GROUP,
-			'label'       => esc_html__( 'What does sending this form mean?', 'bricks-meta-events' ),
+			'label'       => esc_html__( 'Event', 'bricks-meta-events' ),
 			'type'        => 'select',
 			'options'     => Event_Map::options(),
 			'default'     => Settings::default_intent(),
+			// Bricks shows "Default" until an option is picked; show the one
+			// that will actually be sent instead.
+			'placeholder' => Event_Map::options()[ Settings::default_intent() ],
 			'clearable'   => false,
-			'description' => esc_html__( 'The name in brackets is what you will see in Meta Events Manager.', 'bricks-meta-events' ),
+			'description' => esc_html__( 'The name in brackets is what Events Manager shows.', 'bricks-meta-events' ),
 			'required'    => $enabled,
 		);
 
 		$controls['bmeCustomName'] = array(
 			'tab'            => 'content',
 			'group'          => self::GROUP,
-			'label'          => esc_html__( 'Your event name', 'bricks-meta-events' ),
+			'label'          => esc_html__( 'Event name', 'bricks-meta-events' ),
 			'type'           => 'text',
 			'hasDynamicData' => false,
 			'placeholder'    => 'BrochureRequest',
-			'info'           => esc_html__( 'Meta cannot use your own names for most ad goals until they build up plenty of activity. Pick one of the standard options above unless you are sure.', 'bricks-meta-events' ),
+			'info'           => esc_html__( 'Most ad goals can\'t use your own event until it has built up lots of activity. Pick a standard event unless you\'re sure.', 'bricks-meta-events' ),
 			'required'       => array( $enabled, array( 'bmeIntent', '=', Event_Map::CUSTOM_INTENT ) ),
 		);
 
@@ -225,18 +231,19 @@ class Element_Controls {
 			'label'          => esc_html__( 'Name in Events Manager', 'bricks-meta-events' ),
 			'type'           => 'text',
 			'hasDynamicData' => false,
-			'placeholder'    => esc_html__( 'Auto', 'bricks-meta-events' ),
+			'placeholder'    => esc_html__( 'Automatic', 'bricks-meta-events' ),
+			'description'    => esc_html__( 'Leave blank to name it after the form automatically.', 'bricks-meta-events' ),
 			'required'       => $enabled,
 		);
 
 		$controls['bmeValue'] = array(
 			'tab'            => 'content',
 			'group'          => self::GROUP,
-			'label'          => esc_html__( 'What one of these is worth', 'bricks-meta-events' ),
+			'label'          => esc_html__( 'Value', 'bricks-meta-events' ),
 			'type'           => 'number',
 			'min'            => 0,
 			'hasDynamicData' => false,
-			'description'    => esc_html__( 'Meta uses this to work out what your ads earn you. Leave it blank if you do not know, because a wrong figure is worse than none.', 'bricks-meta-events' ),
+			'description'    => esc_html__( 'What one submission is worth to you, so Meta can work out what your ads earn. Leave blank if you\'re not sure: a wrong figure is worse than none.', 'bricks-meta-events' ),
 			'required'       => $enabled,
 		);
 
@@ -253,7 +260,7 @@ class Element_Controls {
 		$controls['bmeSendMode'] = array(
 			'tab'         => 'content',
 			'group'       => self::GROUP,
-			'label'       => esc_html__( 'How to send it', 'bricks-meta-events' ),
+			'label'       => esc_html__( 'Sending', 'bricks-meta-events' ),
 			'type'        => 'select',
 			'options'     => array(
 				Form_Tracker::MODE_AUTO    => esc_html__( 'Automatic', 'bricks-meta-events' ),
@@ -262,15 +269,18 @@ class Element_Controls {
 				Form_Tracker::MODE_BROWSER => esc_html__( 'From the visitor\'s browser only', 'bricks-meta-events' ),
 			),
 			'default'     => Form_Tracker::MODE_AUTO,
+			// Without this Bricks shows "Default", while the description
+			// tells people to leave it on Automatic.
+			'placeholder' => esc_html__( 'Automatic', 'bricks-meta-events' ),
 			'clearable'   => false,
-			'description' => esc_html__( 'Leave this on Automatic: it handles forms that redirect, and never counts one enquiry twice. Change it only when testing.', 'bricks-meta-events' ),
+			'description' => esc_html__( 'Leave on Automatic: it handles forms that redirect, and never counts one enquiry twice. Change it only when testing.', 'bricks-meta-events' ),
 			'required'    => $enabled,
 		);
 
 		$controls['bmeFieldsSeparator'] = array(
 			'tab'      => 'content',
 			'group'    => self::GROUP,
-			'label'    => esc_html__( 'Matching the customer', 'bricks-meta-events' ),
+			'label'    => esc_html__( 'Customer details', 'bricks-meta-events' ),
 			'type'     => 'separator',
 			'required' => $enabled,
 		);
@@ -279,7 +289,7 @@ class Element_Controls {
 			'tab'      => 'content',
 			'group'    => self::GROUP,
 			'type'     => 'info',
-			'content'  => esc_html__( 'Email and phone are picked up automatically from your field types, and a logged in visitor is matched by their account. Only fill these in when the wrong field is being picked up. Paste the field\'s ID copied from each field in your form.', 'bricks-meta-events' ),
+			'content'  => esc_html__( 'Email, phone and name are found automatically. Fill these in only if the wrong field is picked up, using the ID shown on each form field.', 'bricks-meta-events' ),
 			'required' => $enabled,
 		);
 
@@ -290,7 +300,7 @@ class Element_Controls {
 				'label'          => $label,
 				'type'           => 'text',
 				'hasDynamicData' => false,
-				'placeholder'    => esc_html__( 'Picked up automatically', 'bricks-meta-events' ),
+				'placeholder'    => esc_html__( 'Automatic', 'bricks-meta-events' ),
 				'required'       => $enabled,
 			);
 		}
@@ -327,7 +337,7 @@ class Element_Controls {
 	 */
 	private static function site_status(): string {
 		if ( '' === Host::current() ) {
-			return esc_html__( 'Neither Meta for WooCommerce nor Meta pixel for WordPress is switched on, so nothing can be tracked.', 'bricks-meta-events' );
+			return esc_html__( 'Nothing can be tracked until Meta for WooCommerce or Meta pixel for WordPress is switched on.', 'bricks-meta-events' );
 		}
 
 		$pixel = Host::pixel_id();
@@ -366,14 +376,14 @@ class Element_Controls {
 		if ( ! $matching ) {
 			return sprintf(
 				/* translators: %s: Meta pixel ID. */
-				esc_html__( 'Pixel %s is connected, but customer matching is switched off. Email and phone are removed before anything is sent, so Meta will count the enquiry but cannot tell who made it. See Settings, Bricks Meta Events.', 'bricks-meta-events' ),
+				esc_html__( 'Pixel %s connected, but advanced matching is off, so Meta can\'t tell who sent each conversion. See Settings, Bricks Meta Events.', 'bricks-meta-events' ),
 				$pixel
 			);
 		}
 
 		return sprintf(
 			/* translators: %s: Meta pixel ID. */
-			esc_html__( 'Pixel %s connected, and customers are being matched.', 'bricks-meta-events' ),
+			esc_html__( 'Pixel %s connected through Meta pixel for WordPress.', 'bricks-meta-events' ),
 			$pixel
 		);
 	}
