@@ -52,9 +52,13 @@
 	 * It holds events while consent is revoked, queues those fired before the
 	 * pixel has initialised, and ignores an event ID it has already seen.
 	 * Calling fbq skips all three, and skipping the first is a consent bug.
+	 *
+	 * Meta pixel for WordPress names it FacebookSignal and Meta for
+	 * WooCommerce FacebookSignals, with the same signature. The server says
+	 * which one this site has.
 	 */
 	function send( name, params, eventId, method ) {
-		var signal = window.FacebookSignal;
+		var signal = window[ config.sender || 'FacebookSignal' ];
 
 		if ( ! name || ! signal || typeof signal.trackEvent !== 'function' ) {
 			return false;
@@ -157,7 +161,7 @@
 	 */
 	function blockedReason( name ) {
 		if ( config.staff ) {
-			return 'did not send ' + name + ' because you are signed in as staff. Meta pixel for WordPress ignores anyone who can edit posts or upload files. Try again in a private window.';
+			return 'did not send ' + name + ' because you are signed in as staff. ' + ( config.staffNote || '' ) + ' Try again in a private window.';
 		}
 
 		return 'did not send ' + name + ' because tracking is switched off for this visitor.';

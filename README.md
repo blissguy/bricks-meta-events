@@ -4,11 +4,25 @@ Sends server-verified Meta conversion events for Bricks Builder forms, deduplica
 
 The official **Meta pixel for WordPress** plugin auto-tracks conversions for nine form plugins — Contact Form 7, WPForms, Ninja, Formidable, Caldera, Mailchimp for WP, EDD, WP eCommerce and WooCommerce — from a hardcoded list, with no filter to extend it. Bricks is not among them. On a Bricks site the only Meta signals are site-wide `PageView` plus the WooCommerce funnel; every Bricks form is invisible.
 
-This plugin closes that gap.
+This plugin closes that gap. **Meta for WooCommerce** has the same blind spot: it tracks the shop, plus Contact Form 7 and WPForms, and nothing else.
 
 ## It has no settings of its own
 
-Pixel ID, Conversions API access token, advanced matching and consent state are all inherited from Meta pixel for WordPress. There is nothing to copy, paste or keep in sync, and no credential lives in this plugin.
+Pixel ID, Conversions API connection and consent state are all inherited from whichever Meta plugin the site already uses. There is nothing to copy, paste or keep in sync, and no credential lives in this plugin.
+
+## Which Meta plugin
+
+Either **Meta for WooCommerce** or **Meta pixel for WordPress** will do. WordPress's `Requires Plugins` header can only demand every plugin it lists, so the dependency is checked at runtime: with neither active, nothing fatals and an admin notice says what is missing.
+
+| | Meta pixel for WordPress | Meta for WooCommerce |
+|---|---|---|
+| Browser sender | `window.FacebookSignal.trackEvent()` | `window.FacebookSignals.trackEvent()`, same signature |
+| Server sender | Its event factory, sent through a background loopback | `Events\Event` + `API::send_pixel_events()`, sent inline and Meta's reply recorded |
+| Customer details | Stripped when advanced matching is off | Sent whenever a form collects them |
+| Staff | Anyone who can `edit_posts` or `upload_files`, discarded by the host with no filter | Anyone who can `manage_woocommerce`, skipped by this plugin; sent to Test Events while test mode is on |
+| Test mode | Forces inline sending so the code can be attached | Code added through `wc_facebook_api_pixel_event_request_data` |
+
+**When both are active, Meta for WooCommerce is used**, as long as it has a pixel. Meta pixel for WordPress steps back from WooCommerce events when it sees Meta for WooCommerce, but still prints its own pixel and PageView, so with both on every page view is counted twice. The Status tab warns about this. Filter `bme_host` to force one; naming a plugin that isn't active is ignored.
 
 ## Requirements
 
@@ -17,7 +31,8 @@ Pixel ID, Conversions API access token, advanced matching and consent state are 
 | WordPress | 6.5+ |
 | PHP | 8.1+ |
 | Bricks | 2.0+ (developed against 2.4) |
-| Meta pixel for WordPress | 5.2+ — **required**, enforced via `Requires Plugins` |
+| Meta for WooCommerce | 3.7+ — **or** the one below |
+| Meta pixel for WordPress | 5.2+ — **or** the one above |
 
 ## How it works
 
@@ -59,14 +74,14 @@ A wrong identifier is worse than a missing one — Meta counts a garbage hash as
 
 ## Diagnostics
 
-**Settings → Bricks Meta Events.** Built first, because the host plugin fails silently in ways that look identical to working:
+**Settings → Bricks Meta Events**, in four tabs: Status (the checks), Conversions (the log), Settings and Testing (test mode and the test event). Built first, because Meta pixel for WordPress fails silently in ways that look identical to working. The first four below apply to it only; on Meta for WooCommerce the screen checks the connection, the staff rule and the both-active double count instead.
 
 - **Advanced matching off.** `AAMFieldsExtractor` returns an empty array when automatic matching is disabled, stripping every hashed email, phone and name before the request is built. It defaults to *off* on any site not connected through Facebook Business Extension. Events arrive, totals look right, match quality is zero, and nothing is logged anywhere. Re-checked daily, because the setting is fetched from Meta and cached.
 - **Your own events are discarded.** The host plugin drops events from anyone who can `edit_posts` or `upload_files`, with no filter. You cannot test as an administrator. Every role holding either capability is listed — on a membership site, a member role with `upload_files` silently voids every paying customer's conversion.
 - **Loopback delivery.** Conversions API events normally ride a non-blocking request from WordPress to its own `admin-ajax.php`. Security plugins routinely block it and the events vanish with no error. When the probe detects this, events are sent **inline** during submission instead — one extra round trip to Meta, rather than silent total loss. Filterable via `bme_send_synchronously`.
 - **Send a test event** — builds a real event and sends it synchronously, bypassing the background loopback, then prints Meta's raw response and which identifiers survived matching.
-- **Last conversion sent** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
-- **Test mode** — save a code from Events Manager → Test Events and conversions from your forms go there instead of counting towards live figures. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
+- **Last conversion** — event, resolved label, event ID, page, delivery route, outcome and which identifiers were sent, followed by the recent history behind it.
+- **Test mode** — a switch plus a code from Events Manager → Test Events. While it's on, conversions from your forms go there instead of counting towards live figures. The code stays saved when the switch is off. A site upgraded from before 0.9.0 with a code saved stays in test mode until someone turns it off, because a saved code used to be the switch. Real submissions carry no test code otherwise, so without this there is no way to check a setup without dirtying the data you report on.
 
 ## Tracking a button or a link
 
@@ -95,12 +110,12 @@ Anything outside Meta's standard event list is sent as a custom event automatica
 
 ## Site-wide settings
 
-**Settings → Bricks Meta Events → Settings.** Each one is a default that any individual form can override:
+**Settings → Bricks Meta Events → Settings tab.** Each one is a default that any individual form can override:
 
-- **What most of your forms mean** — newly tracked forms start on this outcome.
-- **Currency** — used when a form sets a value but no currency. Falls back to the WooCommerce currency, then USD.
-- **Do not track these people** — signed-in roles to skip, on top of those the host plugin already discards. Only roles our setting can actually affect are listed; offering a checkbox for an already-excluded role would be a control that does nothing.
-- **Never send customer details** — strips every identifier from every form. Meta still counts the conversion but cannot attribute it.
+- **Default form event** — newly tracked forms start on this outcome.
+- **Default currency** — used when a form sets a value but no currency. Falls back to the WooCommerce currency, then USD.
+- **Excluded roles** — signed-in roles to skip, on top of those the host plugin already discards. Only roles our setting can actually affect are listed; offering a checkbox for an already-excluded role would be a control that does nothing.
+- **Customer details** — strips every identifier from every form. Meta still counts the conversion but cannot attribute it.
 - **Phone and email links** — off by default. Turning it on counts a `tel:` or `mailto:` click as `Contact`, deduplicated per link per visit, via one delegated listener rather than per-element markup. Off by default because optimising ads towards unverified clicks makes them worse, so it should be a deliberate choice.
 
 ## Filters
@@ -109,7 +124,7 @@ Anything outside Meta's standard event list is sent as a custom event automatica
 |---|---|
 | `bme_send_synchronously` | Force or prevent inline Conversions API delivery. Defaults to inline when the loopback probe has failed, when a handed-over conversion was never confirmed, or when test mode is on. |
 | `bme_enqueue_tracking` | Return false to stop loading the browser tracking script. |
-
+| `bme_host` | `'woo'` or `'pixel'`. Which Meta plugin to send through when both are active. Ignored when it names one that isn't active. |
 
 
 ## Licence

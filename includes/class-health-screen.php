@@ -17,6 +17,30 @@ class Health_Screen {
 	private const NONCE_ACTION = 'bme_health_action';
 
 	/**
+	 * The screen's tabs, in order. The first is the default.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function tabs(): array {
+		return array(
+			'status'      => __( 'Status', 'bricks-meta-events' ),
+			'conversions' => __( 'Conversions', 'bricks-meta-events' ),
+			'settings'    => __( 'Settings', 'bricks-meta-events' ),
+			'testing'     => __( 'Testing', 'bricks-meta-events' ),
+		);
+	}
+
+	/**
+	 * The tab being viewed.
+	 */
+	private static function current_tab(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only view switch.
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
+
+		return isset( self::tabs()[ $tab ] ) ? $tab : (string) array_key_first( self::tabs() );
+	}
+
+	/**
 	 * Render the screen.
 	 */
 	public static function render(): void {
@@ -26,21 +50,69 @@ class Health_Screen {
 
 		$notice = self::handle_actions();
 
+		$tab = self::current_tab();
+
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Bricks Meta Events', 'bricks-meta-events' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'This plugin has no settings of its own. Your pixel, connection and matching settings all come from Meta pixel for WordPress.', 'bricks-meta-events' ) . '</p>';
+
+		if ( '' !== Host::current() ) {
+			echo '<p class="description">' . esc_html(
+				sprintf(
+					/* translators: %s: host plugin name. */
+					__( 'Pixel, connection and matching settings come from %s.', 'bricks-meta-events' ),
+					Host::name()
+				)
+			) . '</p>';
+		}
+
+		echo '<nav class="nav-tab-wrapper" style="margin-bottom:1em">';
+
+		foreach ( self::tabs() as $slug => $label ) {
+			printf(
+				'<a href="%s" class="nav-tab%s"%s>%s</a>',
+				esc_url( add_query_arg( 'tab', $slug, admin_url( 'options-general.php?page=bricks-meta-events' ) ) ),
+				$slug === $tab ? ' nav-tab-active' : '',
+				$slug === $tab ? ' aria-current="page"' : '',
+				esc_html( $label )
+			);
+		}
+
+		echo '</nav>';
 
 		if ( '' !== $notice ) {
 			echo wp_kses_post( $notice );
 		}
 
-		self::render_settings();
-		self::render_checks();
-		self::render_last_event();
-		self::render_log();
-		self::render_loopback();
-		self::render_test_mode();
-		self::render_test_event();
+		// Test mode quietly diverts real conversions, so it is announced on
+		// every tab rather than only where it is switched on.
+		if ( '' !== Form_Tracker::test_event_code() && 'testing' !== $tab ) {
+			printf(
+				'<div class="notice notice-warning inline"><p>%s</p></div>',
+				esc_html__( 'Test mode is on. Form conversions go to Test Events, not your real figures.', 'bricks-meta-events' )
+			);
+		}
+
+		// Forms post back to the current URL, tab included, so every action
+		// returns to the tab it was taken on.
+		switch ( $tab ) {
+			case 'conversions':
+				self::render_last_event();
+				self::render_log();
+				break;
+
+			case 'settings':
+				self::render_settings();
+				break;
+
+			case 'testing':
+				self::render_test_mode();
+				self::render_test_event();
+				break;
+
+			default:
+				self::render_checks();
+				self::render_loopback();
+		}
 
 		echo '</div>';
 	}
@@ -81,19 +153,35 @@ class Health_Screen {
 			$code = isset( $_POST['bme_test_code'] )
 				? sanitize_text_field( wp_unslash( $_POST['bme_test_code'] ) )
 				: '';
+			$on   = ! empty( $_POST['bme_test_mode'] );
 
 			if ( '' === $code ) {
 				delete_option( Plugin::OPTION_TEST_CODE );
+			} else {
+				update_option( Plugin::OPTION_TEST_CODE, $code, false );
+			}
 
-				return '<div class="notice notice-success"><p>'
-					. esc_html__( 'Test mode is off. Conversions are going to your real figures again.', 'bricks-meta-events' )
+			// Test mode without a code would send nothing to Test Events and
+			// everything to the real figures, which is the opposite of what
+			// ticking the box asked for.
+			if ( $on && '' === $code ) {
+				update_option( Plugin::OPTION_TEST_MODE, '0', false );
+
+				return '<div class="notice notice-error"><p>'
+					. esc_html__( 'Add a test code to turn on test mode. Test mode is still off.', 'bricks-meta-events' )
 					. '</p></div>';
 			}
 
-			update_option( Plugin::OPTION_TEST_CODE, $code, false );
+			update_option( Plugin::OPTION_TEST_MODE, $on ? '1' : '0', false );
+
+			if ( ! $on ) {
+				return '<div class="notice notice-success"><p>'
+					. esc_html__( 'Test mode is off. Form conversions count towards your real figures again.', 'bricks-meta-events' )
+					. '</p></div>';
+			}
 
 			return '<div class="notice notice-warning"><p>'
-				. esc_html__( 'Test mode is on. Conversions from your forms will go to Test Events, not your real figures.', 'bricks-meta-events' )
+				. esc_html__( 'Test mode is on. Form conversions go to Test Events, not your real figures.', 'bricks-meta-events' )
 				. '</p></div>';
 		}
 
@@ -124,7 +212,6 @@ class Health_Screen {
 	private static function render_settings(): void {
 		$settings = Settings::all();
 
-		echo '<h2>' . esc_html__( 'Settings', 'bricks-meta-events' ) . '</h2>';
 		echo '<form method="post">';
 		wp_nonce_field( self::NONCE_ACTION );
 		echo '<input type="hidden" name="bme_action" value="save_settings">';
@@ -132,7 +219,7 @@ class Health_Screen {
 
 		// Default outcome for newly tracked forms.
 		echo '<tr><th scope="row"><label for="bme-default-intent">'
-			. esc_html__( 'What most of your forms mean', 'bricks-meta-events' ) . '</label></th><td>';
+			. esc_html__( 'Default form event', 'bricks-meta-events' ) . '</label></th><td>';
 		echo '<select name="default_intent" id="bme-default-intent">';
 
 		foreach ( Event_Map::options() as $value => $label ) {
@@ -153,19 +240,19 @@ class Health_Screen {
 			'<tr><th scope="row"><label for="bme-currency">%s</label></th><td>'
 			. '<input type="text" name="currency" id="bme-currency" class="small-text" value="%s" placeholder="%s">'
 			. '<p class="description">%s</p></td></tr>',
-			esc_html__( 'Currency', 'bricks-meta-events' ),
+			esc_html__( 'Default currency', 'bricks-meta-events' ),
 			esc_attr( (string) $settings['currency'] ),
 			esc_attr( Settings::default_currency() ),
-			esc_html__( 'Used when a form has a value but no currency of its own. Leave blank to use your store currency.', 'bricks-meta-events' )
+			esc_html__( 'Used when a form has a value but no currency. Leave blank to use your store currency.', 'bricks-meta-events' )
 		);
 
 		// Roles our own setting can actually affect.
 		$selectable = self::selectable_roles();
 
-		echo '<tr><th scope="row">' . esc_html__( 'Do not track these people', 'bricks-meta-events' ) . '</th><td>';
+		echo '<tr><th scope="row">' . esc_html__( 'Excluded roles', 'bricks-meta-events' ) . '</th><td>';
 
 		if ( empty( $selectable ) ) {
-			echo '<p class="description">' . esc_html__( 'Every role on this site is already excluded by Meta pixel for WordPress.', 'bricks-meta-events' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Every role on this site is already excluded as staff.', 'bricks-meta-events' ) . '</p>';
 		} else {
 			foreach ( $selectable as $slug => $name ) {
 				printf(
@@ -176,19 +263,26 @@ class Health_Screen {
 				);
 			}
 
-			echo '<p class="description">' . esc_html__( 'Signed in visitors with these roles are skipped. Useful when you do not want existing customers counted as new enquiries. Roles that can edit posts or upload files are already skipped and are not listed.', 'bricks-meta-events' ) . '</p>';
+			echo '<p class="description">' . esc_html(
+				sprintf(
+					/* translators: %s: who counts as staff, e.g. "can manage WooCommerce". */
+					__( 'Signed-in visitors with these roles aren\'t tracked, for example existing customers. Anyone who %s is always excluded.', 'bricks-meta-events' ),
+					Host::staff_rule()
+				)
+			) . '</p>';
 		}
 
 		echo '</td></tr>';
 
-		// The blanket privacy switch.
+		// The blanket privacy switch. Styled as a warning because switching it
+		// on quietly makes every ad result look worse.
 		printf(
 			'<tr><th scope="row">%s</th><td><label><input type="checkbox" name="never_send_details" value="1"%s> %s</label>'
-			. '<p class="description">%s</p></td></tr>',
+			. '<p class="description"><span class="dashicons dashicons-warning" style="color:#dba617;font-size:16px;width:16px;height:16px;vertical-align:text-bottom" aria-hidden="true"></span> %s</p></td></tr>',
 			esc_html__( 'Customer details', 'bricks-meta-events' ),
 			checked( Settings::never_send_details(), true, false ),
-			esc_html__( 'Never send them', 'bricks-meta-events' ),
-			esc_html__( 'Turn this on and no email, phone, name or account is sent from any form. Meta still counts the enquiry but cannot tell who made it, so your ad results will look worse. Only use it if you have to.', 'bricks-meta-events' )
+			esc_html__( 'Never send email, phone, name or account', 'bricks-meta-events' ),
+			esc_html__( 'Meta still counts each conversion but can\'t tell who it was, so ad results look worse. Turn on only if you have to.', 'bricks-meta-events' )
 		);
 
 		// Clicks, unlike form submissions, cannot be verified.
@@ -197,8 +291,8 @@ class Health_Screen {
 			. '<p class="description">%s</p></td></tr>',
 			esc_html__( 'Phone and email links', 'bricks-meta-events' ),
 			checked( Settings::track_links(), true, false ),
-			esc_html__( 'Count a click as getting in touch', 'bricks-meta-events' ),
-			esc_html__( 'Records a Contact when someone clicks a phone number or email address link. These are clicks rather than confirmed enquiries, so they are less reliable than forms and no customer details are sent with them.', 'bricks-meta-events' )
+			esc_html__( 'Count a click as Contact', 'bricks-meta-events' ),
+			esc_html__( 'Clicks are less reliable than form submissions and carry no customer details.', 'bricks-meta-events' )
 		);
 
 		echo '</tbody></table>';
@@ -209,9 +303,9 @@ class Health_Screen {
 	/**
 	 * Roles this plugin's exclusion setting can actually change.
 	 *
-	 * Anyone who can edit posts or upload files is already discarded inside
-	 * Meta pixel for WordPress, so offering a checkbox for them would be a
-	 * control that does nothing.
+	 * Staff are already skipped, by Meta pixel for WordPress itself or by our
+	 * own rule on Meta for WooCommerce, so offering a checkbox for them would
+	 * be a control that does nothing.
 	 *
 	 * @return array<string, string>
 	 */
@@ -221,7 +315,7 @@ class Health_Screen {
 		foreach ( wp_roles()->roles as $slug => $role ) {
 			$caps = isset( $role['capabilities'] ) ? (array) $role['capabilities'] : array();
 
-			if ( ! empty( $caps['edit_posts'] ) || ! empty( $caps['upload_files'] ) ) {
+			if ( Host::role_is_staff( $caps ) ) {
 				continue;
 			}
 
@@ -235,15 +329,21 @@ class Health_Screen {
 	 * Render the check table.
 	 */
 	private static function render_checks(): void {
-		echo '<h2>' . esc_html__( 'Diagnostics', 'bricks-meta-events' ) . '</h2>';
 		echo '<table class="widefat striped"><tbody>';
 
 		foreach ( Diagnostics::run() as $check ) {
+			// The pixel ID is something people copy and compare against Events
+			// Manager, so it gets the code face rather than prose.
+			$message = 'pixel_id' === $check['id'] && Diagnostics::OK === $check['status']
+				? '<code>' . esc_html( $check['message'] ) . '</code>'
+				: esc_html( $check['message'] );
+
 			printf(
-				'<tr><td style="width:1%%;padding-right:0">%s</td><td style="width:22%%"><strong>%s</strong></td><td>%s%s</td></tr>',
+				'<tr><td style="width:1%%;padding-right:0">%s</td><td style="width:22%%"><strong>%s</strong></td><td>%s%s%s</td></tr>',
 				wp_kses_post( self::status_icon( $check['status'] ) ),
 				esc_html( $check['label'] ),
-				esc_html( $check['message'] ),
+				'' !== $check['summary'] ? '<strong>' . esc_html( $check['summary'] ) . '</strong> ' : '',
+				$message, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped above.
 				'' !== $check['fix']
 					? '<br><em style="color:#646970">' . esc_html( $check['fix'] ) . '</em>'
 					: ''
@@ -261,12 +361,12 @@ class Health_Screen {
 	 * advanced matching.
 	 */
 	private static function render_last_event(): void {
-		echo '<h2>' . esc_html__( 'Last conversion sent', 'bricks-meta-events' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Last conversion', 'bricks-meta-events' ) . '</h2>';
 
 		$last = Event_Log::latest();
 
 		if ( ! is_array( $last ) || empty( $last['event'] ) ) {
-			echo '<p>' . esc_html__( 'Nothing yet. Send a tracked form while signed out and it will show up here.', 'bricks-meta-events' ) . '</p>';
+			echo '<p>' . esc_html__( 'Nothing yet. Submit a tracked form while signed out and it shows up here.', 'bricks-meta-events' ) . '</p>';
 
 			return;
 		}
@@ -276,7 +376,6 @@ class Health_Screen {
 		$rows = array(
 			__( 'Event', 'bricks-meta-events' )    => $last['event'],
 			__( 'Name in Events Manager', 'bricks-meta-events' ) => $last['label'] ?? '',
-			__( 'Result', 'bricks-meta-events' )  => $outcome_label,
 			__( 'When', 'bricks-meta-events' )     => sprintf(
 				/* translators: %s: human-readable time difference. */
 				__( '%s ago', 'bricks-meta-events' ),
@@ -289,7 +388,7 @@ class Health_Screen {
 				: __( 'In the background', 'bricks-meta-events' ),
 			__( 'Customer details sent', 'bricks-meta-events' ) => ! empty( $last['matched'] )
 				? implode( ', ', (array) $last['matched'] )
-				: __( 'None. Everything was removed before sending, so Meta cannot tell who this was.', 'bricks-meta-events' ),
+				: __( 'None, so Meta can\'t tell who this was.', 'bricks-meta-events' ),
 		);
 
 		printf( '<p>%s <strong>%s</strong></p>', wp_kses_post( self::status_icon( $status ) ), esc_html( $outcome_label ) );
@@ -380,7 +479,7 @@ class Health_Screen {
 		echo '<h2>' . esc_html__( 'Earlier conversions', 'bricks-meta-events' ) . '</h2>';
 
 		if ( count( $log ) < 2 ) {
-			echo '<p>' . esc_html__( 'Nothing earlier yet. Once you have sent more than one, the last fifty are listed here.', 'bricks-meta-events' ) . '</p>';
+			echo '<p>' . esc_html__( 'Nothing earlier yet. The last 50 conversions are listed here.', 'bricks-meta-events' ) . '</p>';
 
 			return;
 		}
@@ -436,27 +535,52 @@ class Health_Screen {
 	 * you report on.
 	 */
 	private static function render_test_mode(): void {
-		$code = Form_Tracker::test_event_code();
-
 		echo '<h2>' . esc_html__( 'Test mode', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'While a code is saved here, conversions from your forms go to Events Manager, Test Events instead of your real figures. Tracking also reports what it is doing in your browser console, which is the only way to check a button or a link, because a click leaves no record on the server. Copy the code from the Test Events tab, and empty this box when you have finished checking.', 'bricks-meta-events' ) . '</p>';
 
-		if ( '' !== $code ) {
-			printf(
-				'<p>%s <strong>%s</strong></p>',
-				wp_kses_post( self::status_icon( Diagnostics::WARNING ) ),
-				esc_html__( 'Test mode is on, so none of these conversions are counting towards your real figures.', 'bricks-meta-events' )
+		// Linked straight to this pixel's Test Events tab, which is both where
+		// the code is copied from and where the results show up.
+		$place = esc_html__( 'Events Manager, Test Events', 'bricks-meta-events' );
+		$url   = Host::events_manager_url( true );
+
+		if ( '' !== $url ) {
+			$place = sprintf(
+				'<a href="%s" target="_blank" rel="noopener noreferrer">%s<span class="screen-reader-text"> %s</span></a>',
+				esc_url( $url ),
+				$place,
+				esc_html__( '(opens in a new tab)', 'bricks-meta-events' )
 			);
 		}
 
 		echo '<form method="post">';
 		wp_nonce_field( self::NONCE_ACTION );
 		echo '<input type="hidden" name="bme_action" value="save_test_code">';
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		// The switch. The code below stays saved when it is off.
 		printf(
-			'<input type="text" name="bme_test_code" class="regular-text" value="%s" placeholder="%s"> ',
-			esc_attr( $code ),
-			esc_attr__( 'TEST12345', 'bricks-meta-events' )
+			'<tr><th scope="row">%s</th><td><label><input type="checkbox" name="bme_test_mode" value="1"%s> %s</label>'
+			. '<p class="description">%s</p></td></tr>',
+			esc_html__( 'Test mode', 'bricks-meta-events' ),
+			checked( Form_Tracker::test_mode_on(), true, false ),
+			esc_html__( 'Send form conversions to Test Events instead of your real figures', 'bricks-meta-events' ),
+			esc_html__( 'While it\'s on, your browser console also shows what each button and link sends.', 'bricks-meta-events' )
 		);
+
+		printf(
+			'<tr><th scope="row"><label for="bme-test-code">%s</label></th><td>'
+			. '<input type="text" name="bme_test_code" id="bme-test-code" class="regular-text" value="%s" placeholder="%s">'
+			. '<p class="description">%s</p></td></tr>',
+			esc_html__( 'Test code', 'bricks-meta-events' ),
+			esc_attr( Form_Tracker::saved_test_code() ),
+			esc_attr__( 'TEST12345', 'bricks-meta-events' ),
+			sprintf(
+				/* translators: %s: "Events Manager, Test Events", linked. */
+				esc_html__( 'Copy it from %s.', 'bricks-meta-events' ),
+				$place // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped above.
+			)
+		);
+
+		echo '</tbody></table>';
 		submit_button( __( 'Save', 'bricks-meta-events' ), 'secondary', 'submit', false );
 		echo '</form>';
 	}
@@ -465,10 +589,16 @@ class Health_Screen {
 	 * Render the loopback probe block.
 	 */
 	private static function render_loopback(): void {
+		// Meta for WooCommerce sends straight to Meta, never through the
+		// site's own address, so there is nothing here to block.
+		if ( Host::PIXEL !== Host::current() ) {
+			return;
+		}
+
 		$result = Diagnostics::loopback();
 
 		echo '<h2>' . esc_html__( 'Background sending', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Conversions are normally sent in the background, by your site quietly calling its own address. Security plugins often block that, and when they do the conversions disappear with no warning.', 'bricks-meta-events' ) . '</p>';
+		echo '<p>' . esc_html__( 'Conversions are normally sent by your site calling its own address. Security plugins sometimes block this, and conversions then disappear without warning.', 'bricks-meta-events' ) . '</p>';
 
 		printf(
 			'<p>%s %s</p>',
@@ -479,7 +609,7 @@ class Health_Screen {
 		if ( Diagnostics::ERROR === $result['status'] ) {
 			printf(
 				'<p><em>%s</em></p>',
-				esc_html__( 'Because of this, conversions are being sent while the form is submitting instead of in the background. Nothing is lost, but sending takes a moment longer. Fix the block and background sending starts again on its own.', 'bricks-meta-events' )
+				esc_html__( 'Conversions are being sent while the form submits instead, so nothing is lost. Background sending resumes on its own once this passes.', 'bricks-meta-events' )
 			);
 		}
 
@@ -491,11 +621,10 @@ class Health_Screen {
 	 */
 	private static function render_test_event(): void {
 		echo '<h2>' . esc_html__( 'Send a test event', 'bricks-meta-events' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Sends a real Lead to Meta straight away and shows exactly what came back. This skips background sending, so it confirms your connection works and shows which customer details actually got through.', 'bricks-meta-events' ) . '</p>';
-		echo '<p>' . esc_html__( 'Paste a test event code from Events Manager, Test Events, so it shows up there instead of in your real data.', 'bricks-meta-events' ) . '</p>';
+		echo '<p>' . esc_html__( 'Sends a Lead to Meta now and shows Meta\'s reply, including which customer details got through. Add a test code so it lands in Test Events, not your real figures.', 'bricks-meta-events' ) . '</p>';
 
-		if ( ! Host_Adapter::can_send_server_events() ) {
-			echo '<p><em>' . esc_html__( 'Not available while the compatibility check above is failing.', 'bricks-meta-events' ) . '</em></p>';
+		if ( ! Host::can_send_server_events() ) {
+			echo '<p><em>' . esc_html__( 'Not available until the checks under Status pass.', 'bricks-meta-events' ) . '</em></p>';
 
 			return;
 		}
@@ -503,8 +632,11 @@ class Health_Screen {
 		echo '<form method="post">';
 		wp_nonce_field( self::NONCE_ACTION );
 		echo '<input type="hidden" name="bme_action" value="test_event">';
+		// Starts on the test mode code, so a test event lands in the same
+		// Test Events session as the form conversions being checked.
 		printf(
-			'<input type="text" name="bme_test_event_code" class="regular-text" placeholder="%s"> ',
+			'<input type="text" name="bme_test_event_code" class="regular-text" value="%s" placeholder="%s"> ',
+			esc_attr( Form_Tracker::saved_test_code() ),
 			esc_attr__( 'TEST12345 (optional)', 'bricks-meta-events' )
 		);
 		submit_button( __( 'Send test event', 'bricks-meta-events' ), 'secondary', 'submit', false );
@@ -522,6 +654,10 @@ class Health_Screen {
 	 * @return string HTML notice.
 	 */
 	private static function send_test_event( string $test_event_code ): string {
+		if ( Host::is_woo() ) {
+			return self::send_woo_test_event( $test_event_code );
+		}
+
 		try {
 			$event = call_user_func(
 				array( Host_Adapter::CLS_EVENT_FACTORY, 'safe_create_event' ),
@@ -573,6 +709,73 @@ class Health_Screen {
 			),
 			esc_html( $matched ),
 			esc_html( wp_json_encode( $response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) )
+		);
+	}
+
+	/**
+	 * The same test, sent through Meta for WooCommerce.
+	 *
+	 * Goes through the exact sender a real submission uses, so a pass here
+	 * means a form will get through too.
+	 *
+	 * @param string $test_event_code Optional Events Manager test code.
+	 *
+	 * @return string HTML notice.
+	 */
+	private static function send_woo_test_event( string $test_event_code ): string {
+		if ( ! Host::can_send_server_events() ) {
+			return sprintf(
+				'<div class="notice notice-error"><p>%s</p></div>',
+				esc_html__( 'Meta for WooCommerce is not ready to send. See the checks above.', 'bricks-meta-events' )
+			);
+		}
+
+		$result = Woo_Adapter::send(
+			array(
+				'event_name'       => 'Lead',
+				'event_id'         => wp_generate_uuid4(),
+				'event_source_url' => home_url( '/' ),
+				'custom_data'      => array(
+					'content_name'            => 'Bricks Meta Events diagnostic',
+					'fb_integration_tracking' => Plugin::INTEGRATION_NAME,
+				),
+				'user_data'        => Woo_Adapter::user_data(
+					array(
+						'email'      => 'test@example.com',
+						'first_name' => 'Test',
+						'last_name'  => 'Visitor',
+					)
+				),
+			),
+			$test_event_code
+		);
+
+		if ( 'held' === $result['outcome'] ) {
+			return sprintf(
+				'<div class="notice notice-warning"><p>%s</p></div>',
+				esc_html__( 'Meta for WooCommerce held this back instead of sending it, because cookie consent has not been given. Nothing reached Meta.', 'bricks-meta-events' )
+			);
+		}
+
+		$success = 'accepted' === $result['outcome'];
+		$matched = empty( $result['matched'] )
+			? __( 'No customer details got through. Meta received this with nothing to identify the person by.', 'bricks-meta-events' )
+			: sprintf(
+				/* translators: %s: comma-separated field names. */
+				__( 'Customer details sent, encrypted: %s.', 'bricks-meta-events' ),
+				implode( ', ', $result['matched'] )
+			);
+
+		return sprintf(
+			'<div class="notice notice-%s"><p><strong>%s</strong></p><p>%s</p><pre style="white-space:pre-wrap;max-height:20em;overflow:auto">%s</pre></div>',
+			$success ? 'success' : 'error',
+			esc_html(
+				$success
+					? __( 'Meta accepted the test event.', 'bricks-meta-events' )
+					: __( 'Meta rejected the test event.', 'bricks-meta-events' )
+			),
+			esc_html( $matched ),
+			esc_html( wp_json_encode( $result['response'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) )
 		);
 	}
 

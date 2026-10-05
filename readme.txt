@@ -4,7 +4,7 @@ Tags: bricks, meta, facebook, pixel, conversions api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.4
+Stable tag: 0.9.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,17 +12,35 @@ Sends Bricks form submissions and button clicks to Meta as conversions. No setup
 
 == Description ==
 
-The official Meta pixel for WordPress plugin auto-tracks conversions for nine form plugins from a hardcoded list, with no filter to extend it. Bricks is not among them, so on a Bricks site every form is invisible to Meta.
+Meta's own plugins track your shop, but not your Bricks forms. This plugin sends them to Meta as conversions, so your ads can learn from enquiries and sign-ups, not only sales.
 
-This plugin closes that gap. It has no settings of its own: pixel ID, Conversions API access token, advanced matching and consent state are all inherited from Meta pixel for WordPress, which is a hard dependency.
+= What it tracks =
 
-Tracking hooks `bricks/form/response`, never `bricks/form/submit`. Submit fires before validation and spam checks, and fires again when Bricks regenerates an expired nonce and resubmits.
+* Bricks forms you switch tracking on for. Failed and spam submissions aren't counted.
+* Buttons and links you choose, such as a booking button or a popup trigger.
+* Clicks on phone numbers and email addresses, if you turn that on.
 
-= Diagnostics =
+Form conversions are sent from your site, so ad blockers and page redirects don't lose them. When the visitor's browser sends one too, Meta counts it once. Email, phone and name are sent encrypted when a form collects them, so Meta can tell who the conversion came from.
 
-Settings → Bricks Meta Events reports the host plugin's silent failure modes: advanced matching being off (which strips every hashed identifier while totals still look correct), your own events being discarded because you can edit posts, and Conversions API delivery being blocked at the loopback. When the loopback is blocked, events are sent inline during submission instead of being lost.
+= What you need =
+
+Meta for WooCommerce or Meta pixel for WordPress, connected to your pixel. This plugin uses that connection and has no pixel settings of its own. If both are on, it uses Meta for WooCommerce.
+
+= Checking it works =
+
+Settings → Bricks Meta Events shows whether everything is connected and lists the last 50 conversions with what happened to each. Test mode sends your form conversions to Events Manager → Test Events instead of your real figures.
 
 == Changelog ==
+
+= 0.9.0 =
+* Works with Meta for WooCommerce as well as Meta pixel for WordPress. Either one will do, and Meta pixel for WordPress is no longer required.
+* When both are switched on, Meta for WooCommerce is used, and the Status tab warns that page views are being counted twice.
+* On Meta for WooCommerce, each conversion is sent straight to Meta and Meta's reply is recorded, so the conversions list shows whether Meta received it rather than only that it was handed over.
+* The plugin's row on the Plugins screen now has a Settings link.
+* Test mode now has its own on and off switch, and the test code stays saved when it's off, so you don't have to copy it from Events Manager again. If a code was saved before this update, test mode stays on until you turn it off.
+* On the Testing tab, "Events Manager, Test Events" links straight to this pixel's Test Events.
+* The settings screen is split into four tabs, Status, Conversions, Settings and Testing, and every check now leads with a one-word status such as Connected or Off. Labels and help text are shorter throughout.
+* On Meta for WooCommerce, people who can manage WooCommerce are not tracked, the same as Meta for WooCommerce does for purchases. With test mode on, their form submissions are sent to Test Events from your site, so you can test while signed in.
 
 = 0.8.4 =
 * Renamed the two success results on the Diagnostics screen so they no longer read as the same news. "Accepted by Meta" is now "Received by Meta, confirmed", and "Sent in the background and confirmed on its way to Meta" is now "Sent in the background, not confirmed by Meta".

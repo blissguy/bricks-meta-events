@@ -326,14 +326,36 @@ class Element_Controls {
 	 * everywhere else because the totals still look right.
 	 */
 	private static function site_status(): string {
-		if ( ! Host_Adapter::probes()['host_active']['ok'] ) {
-			return esc_html__( 'Meta pixel for WordPress is switched off, so nothing can be tracked.', 'bricks-meta-events' );
+		if ( '' === Host::current() ) {
+			return esc_html__( 'Neither Meta for WooCommerce nor Meta pixel for WordPress is switched on, so nothing can be tracked.', 'bricks-meta-events' );
 		}
 
-		$pixel = Host_Adapter::pixel_id();
+		$pixel = Host::pixel_id();
 
 		if ( '' === $pixel ) {
-			return esc_html__( 'No Meta pixel is set up yet. Add one under Settings, Meta.', 'bricks-meta-events' );
+			return sprintf(
+				/* translators: %s: admin menu location. */
+				esc_html__( 'No Meta pixel is set up yet. Add one under %s.', 'bricks-meta-events' ),
+				esc_html( Host::settings_location() )
+			);
+		}
+
+		// Meta for WooCommerce has no matching switch to strip details, so
+		// the only thing worth saying is whether the server half can send.
+		if ( Host::is_woo() ) {
+			if ( ! Host::capi_available() ) {
+				return sprintf(
+					/* translators: %s: Meta pixel ID. */
+					esc_html__( 'Pixel %s isn\'t connected to Meta, so forms are sent from the browser only. See Settings, Bricks Meta Events.', 'bricks-meta-events' ),
+					$pixel
+				);
+			}
+
+			return sprintf(
+				/* translators: %s: Meta pixel ID. */
+				esc_html__( 'Pixel %s connected through Meta for WooCommerce.', 'bricks-meta-events' ),
+				$pixel
+			);
 		}
 
 		$settings = Host_Adapter::aam_settings();

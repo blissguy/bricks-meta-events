@@ -19,6 +19,7 @@ class Plugin {
 	public const OPTION_BACKGROUND_BROKEN = 'bme_background_broken';
 	public const OPTION_EVENT_LOG         = 'bme_event_log';
 	public const OPTION_TEST_CODE         = 'bme_test_event_code';
+	public const OPTION_TEST_MODE         = 'bme_test_mode';
 	public const OPTION_SETTINGS          = 'bme_settings';
 
 	/**
@@ -55,7 +56,10 @@ class Plugin {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::CRON_HOOK );
 		}
 
-		Diagnostics::loopback( true );
+		// Only Meta pixel for WordPress sends through the loopback.
+		if ( Host::PIXEL === Host::current() ) {
+			Diagnostics::loopback( true );
+		}
 
 		// Retired in 0.5.0, when the single last-conversion record became a log.
 		delete_option( 'bme_last_event' );
@@ -86,6 +90,24 @@ class Plugin {
 		add_action( 'admin_notices', array( $this, 'render_admin_notice' ) );
 		add_action( self::CRON_HOOK, array( $this, 'run_scheduled_check' ) );
 		add_action( 'admin_init', array( $this, 'maybe_schedule_cron' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( FILE ), array( $this, 'add_action_links' ) );
+	}
+
+	/**
+	 * Add a Settings link to the plugin's row on the Plugins screen.
+	 *
+	 * @param array<int|string, string> $links Existing action links.
+	 *
+	 * @return array<int|string, string>
+	 */
+	public function add_action_links( $links ): array {
+		$settings = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'options-general.php?page=bricks-meta-events' ) ),
+			esc_html__( 'Settings', 'bricks-meta-events' )
+		);
+
+		return array_merge( array( $settings ), (array) $links );
 	}
 
 	/**
@@ -96,7 +118,7 @@ class Plugin {
 	 * later, and the script does nothing until something happens.
 	 */
 	public function enqueue_tracking(): void {
-		if ( '' === Host_Adapter::pixel_id() ) {
+		if ( '' === Host::pixel_id() ) {
 			return;
 		}
 
@@ -125,13 +147,18 @@ class Plugin {
 			'bme-tracking',
 			'window.bmeConfig = ' . wp_json_encode(
 				array(
-					'enabled'      => ! Host_Adapter::is_internal_user() && ! Settings::current_user_excluded(),
+					'enabled'      => ! Host::is_internal_user() && ! Settings::current_user_excluded(),
 					'trackLinks'   => Settings::track_links(),
 					// While setting up, say out loud what is and is not being
 					// sent. Clicks leave no server record, so without this
 					// there is no way to tell a working button from a dead one.
 					'debug'        => '' !== Form_Tracker::test_event_code(),
-					'staff'        => Host_Adapter::is_internal_user(),
+					'staff'        => Host::is_internal_user(),
+					// Both host plugins offer the same sender under different
+					// names. It holds events until consent and skips an event
+					// ID it has already seen, so it is never bypassed for fbq.
+					'sender'       => Host::browser_sender(),
+					'staffNote'    => Host::staff_note(),
 					'contactEvent' => 'Contact',
 					'standard'     => Event_Map::standard_events(),
 				)
@@ -170,6 +197,12 @@ class Plugin {
 	 * Record whether advanced matching is currently active.
 	 */
 	public function run_scheduled_check(): void {
+		// Meta for WooCommerce sends directly and has no matching switch that
+		// strips details, so neither check means anything there.
+		if ( Host::PIXEL !== Host::current() ) {
+			return;
+		}
+
 		// Refresh the background-sending check too. Whether it works decides
 		// how conversions are sent, and if it has never been checked the
 		// plugin assumes the background route works and quietly loses every

@@ -7,6 +7,9 @@
  * match quality is zero. Everything here exists to make one of those states
  * visible before it costs someone six months of ad spend.
  *
+ * Each row leads with a short status ("Connected.", "Off.") so the screen can
+ * be scanned, then at most one sentence of context and one of fix.
+ *
  * @package BricksMetaEvents
  */
 
@@ -32,18 +35,34 @@ class Diagnostics {
 	 * The loopback probe makes an HTTP request and is excluded; call
 	 * loopback() explicitly.
 	 *
-	 * @return array<int, array{id: string, status: string, label: string, message: string, fix: string}>
+	 * @return array<int, array{id: string, status: string, label: string, summary: string, message: string, fix: string}>
 	 */
 	public static function run(): array {
-		if ( ! Host_Adapter::probes()['host_active']['ok'] ) {
+		if ( '' === Host::current() ) {
 			return array(
 				self::row(
 					'host_active',
 					self::ERROR,
-					__( 'Meta pixel for WordPress is switched off', 'bricks-meta-events' ),
-					__( 'Without it there is no pixel, and no way to send anything to Meta.', 'bricks-meta-events' ),
-					__( 'Switch on Meta pixel for WordPress. Nothing here works until you do.', 'bricks-meta-events' )
+					__( 'Meta plugin', 'bricks-meta-events' ),
+					__( 'None.', 'bricks-meta-events' ),
+					__( 'Nothing can be sent to Meta without Meta for WooCommerce or Meta pixel for WordPress.', 'bricks-meta-events' ),
+					__( 'Switch one of them on.', 'bricks-meta-events' )
 				),
+			);
+		}
+
+		if ( Host::is_woo() ) {
+			return array_merge(
+				self::check_host(),
+				array(
+					self::check_pixel_id(),
+					self::check_woo_connection(),
+					self::check_woo_matching(),
+					self::check_current_user(),
+				),
+				self::check_roles(),
+				self::check_probes(),
+				array( self::check_versions() )
 			);
 		}
 
@@ -51,6 +70,7 @@ class Diagnostics {
 		// fail as a consequence, and leading with the consequence is how
 		// health screens train people to ignore them.
 		return array_merge(
+			self::check_host(),
 			array(
 				self::check_pixel_id(),
 				self::check_access_token(),
@@ -66,6 +86,93 @@ class Diagnostics {
 	}
 
 	/**
+	 * Which Meta plugin is being used, and whether both are switched on.
+	 *
+	 * Meta pixel for WordPress steps back from WooCommerce events when Meta
+	 * for WooCommerce is active, but still prints its own pixel and PageView,
+	 * so with both on every page view is counted twice.
+	 *
+	 * @return array<int, array{id: string, status: string, label: string, summary: string, message: string, fix: string}>
+	 */
+	private static function check_host(): array {
+		$label = __( 'Meta plugin', 'bricks-meta-events' );
+
+		if ( ! Host::both_active() ) {
+			return array( self::row( 'host', self::INFO, $label, '', Host::name(), '' ) );
+		}
+
+		return array(
+			self::row(
+				'host',
+				self::WARNING,
+				$label,
+				Host::name() . '.',
+				Host::is_woo()
+					? __( 'Meta pixel for WordPress is also on, so page views are counted twice.', 'bricks-meta-events' )
+					: __( 'Meta for WooCommerce is also on, so page views are counted twice.', 'bricks-meta-events' ),
+				Host::is_woo()
+					? __( 'Switch off Meta pixel for WordPress.', 'bricks-meta-events' )
+					: __( 'Switch off the one you aren\'t using.', 'bricks-meta-events' )
+			),
+		);
+	}
+
+	/**
+	 * Can Meta for WooCommerce send from the server?
+	 */
+	private static function check_woo_connection(): array {
+		$label = __( 'Connection', 'bricks-meta-events' );
+
+		if ( ! Woo_Adapter::is_connected() ) {
+			return self::row(
+				'woo_connection',
+				self::WARNING,
+				$label,
+				__( 'Not connected.', 'bricks-meta-events' ),
+				__( 'Conversions are sent from the visitor\'s browser only, where ad blockers can lose them.', 'bricks-meta-events' ),
+				__( 'Connect under Marketing, Facebook.', 'bricks-meta-events' )
+			);
+		}
+
+		if ( Woo_Adapter::connection_invalid() ) {
+			return self::row(
+				'woo_connection',
+				self::ERROR,
+				$label,
+				__( 'Rejected by Meta.', 'bricks-meta-events' ),
+				__( 'Nothing is being sent from your site until you reconnect.', 'bricks-meta-events' ),
+				__( 'Reconnect under Marketing, Facebook.', 'bricks-meta-events' )
+			);
+		}
+
+		return self::row(
+			'woo_connection',
+			self::OK,
+			$label,
+			__( 'Connected.', 'bricks-meta-events' ),
+			__( 'Conversions go straight to Meta, and Meta\'s reply is logged under Conversions.', 'bricks-meta-events' ),
+			''
+		);
+	}
+
+	/**
+	 * Advanced matching on Meta for WooCommerce.
+	 *
+	 * Nothing to go wrong here, which is worth saying: on Meta pixel for
+	 * WordPress this is the check that most often fails.
+	 */
+	private static function check_woo_matching(): array {
+		return self::row(
+			'aam',
+			self::OK,
+			__( 'Advanced matching', 'bricks-meta-events' ),
+			__( 'On.', 'bricks-meta-events' ),
+			__( 'Email, phone and name are sent encrypted whenever a form collects them.', 'bricks-meta-events' ),
+			''
+		);
+	}
+
+	/**
 	 * The headline check: is advanced matching actually on?
 	 *
 	 * AAMFieldsExtractor::get_normalized_user_data() returns an empty array
@@ -75,7 +182,7 @@ class Diagnostics {
 	 * through Facebook Business Extension — this is the default state.
 	 */
 	private static function check_advanced_matching(): array {
-		$label = __( 'Customer matching', 'bricks-meta-events' );
+		$label = __( 'Advanced matching', 'bricks-meta-events' );
 
 		// The host plugin abandons set_aam_settings() early when no pixel ID
 		// is present, so matching would always read as off here. Reporting
@@ -85,7 +192,8 @@ class Diagnostics {
 				'aam',
 				self::INFO,
 				$label,
-				__( 'Cannot be checked until a pixel is set up.', 'bricks-meta-events' ),
+				__( 'Not checked.', 'bricks-meta-events' ),
+				__( 'Set up a pixel first.', 'bricks-meta-events' ),
 				''
 			);
 		}
@@ -97,33 +205,29 @@ class Diagnostics {
 				'aam',
 				self::ERROR,
 				$label,
-				__( 'Meta pixel for WordPress has not loaded your matching settings, so email, phone and name are removed from everything you send.', 'bricks-meta-events' ),
-				__( 'Open Settings, Meta and reconnect. These settings come from Meta and are stored for a while, so a failed connection leaves them empty.', 'bricks-meta-events' )
+				__( 'Not loaded.', 'bricks-meta-events' ),
+				__( 'Email, phone and name are removed from everything you send.', 'bricks-meta-events' ),
+				__( 'Reconnect under Settings, Meta.', 'bricks-meta-events' )
 			);
 		}
 
 		if ( ! $settings->getEnableAutomaticMatching() ) {
-			$message = __( 'Customer matching is switched off. Your enquiries still reach Meta and the totals look right, but email, phone and name are removed first, so Meta cannot tell who made them. Your ad results will look far worse than they are.', 'bricks-meta-events' );
-
 			// A failed fetch and a deliberate opt-out produce an identical
 			// disabled settings object. The absence of the cache entry is the
 			// only thing that tells them apart, and the fixes are different.
-			if ( ! Host_Adapter::aam_settings_cached() ) {
-				return self::row(
-					'aam',
-					self::ERROR,
-					$label,
-					$message . ' ' . __( 'Meta pixel for WordPress has also never managed to fetch these settings, so this may be a connection problem rather than a choice.', 'bricks-meta-events' ),
-					__( 'Check this site can reach Meta, then reload. If it can, switch on automatic advanced matching for this pixel in Meta Events Manager.', 'bricks-meta-events' )
-				);
-			}
+			$never_fetched = ! Host_Adapter::aam_settings_cached();
 
 			return self::row(
 				'aam',
 				self::ERROR,
 				$label,
-				$message,
-				__( 'Switch on automatic advanced matching for this pixel in Meta Events Manager, then reload this page.', 'bricks-meta-events' )
+				__( 'Off.', 'bricks-meta-events' ),
+				$never_fetched
+					? __( 'Email, phone and name are removed before sending, and these settings have never been fetched from Meta, so it may be a connection problem.', 'bricks-meta-events' )
+					: __( 'Conversions still count, but email, phone and name are removed first, so Meta can\'t tell who sent them.', 'bricks-meta-events' ),
+				$never_fetched
+					? __( 'Check this site can reach Meta, then turn on automatic advanced matching in Meta Events Manager.', 'bricks-meta-events' )
+					: __( 'Turn on automatic advanced matching for this pixel in Meta Events Manager.', 'bricks-meta-events' )
 			);
 		}
 
@@ -138,12 +242,13 @@ class Diagnostics {
 				'aam',
 				self::WARNING,
 				$label,
+				__( 'Partly on.', 'bricks-meta-events' ),
 				sprintf(
 					/* translators: %s: comma-separated list of field names. */
-					__( 'Matching is on, but these are being left out and will not be sent: %s.', 'bricks-meta-events' ),
+					__( 'Not sent: %s.', 'bricks-meta-events' ),
 					implode( ', ', array_map( array( self::class, 'field_name' ), $missing ) )
 				),
-				__( 'Switch the missing ones on in your Meta Events Manager pixel settings.', 'bricks-meta-events' )
+				__( 'Turn them on in your pixel settings in Meta Events Manager.', 'bricks-meta-events' )
 			);
 		}
 
@@ -151,9 +256,10 @@ class Diagnostics {
 			'aam',
 			self::OK,
 			$label,
+			__( 'On.', 'bricks-meta-events' ),
 			sprintf(
 				/* translators: %d: number of enabled matching fields. */
-				__( 'On, matching on %d details including email and phone.', 'bricks-meta-events' ),
+				__( 'Matching on %d details, including email and phone.', 'bricks-meta-events' ),
 				count( $enabled )
 			),
 			''
@@ -161,54 +267,65 @@ class Diagnostics {
 	}
 
 	/**
-	 * Warn the person reading the screen that their own events are discarded.
+	 * Tell the person reading the screen whether their own events count.
 	 *
 	 * Almost everyone testing this plugin will be an administrator, will see
 	 * nothing in Events Manager, and will conclude it is broken.
 	 */
 	private static function check_current_user(): array {
-		$label = __( 'Your own events', 'bricks-meta-events' );
+		$label = __( 'Your account', 'bricks-meta-events' );
 
-		if ( ! Host_Adapter::is_internal_user() ) {
+		if ( ! Host::is_internal_user() ) {
+			return self::row( 'current_user', self::OK, $label, __( 'Tracked.', 'bricks-meta-events' ), '', '' );
+		}
+
+		if ( Host::staff_can_test() ) {
 			return self::row(
 				'current_user',
 				self::OK,
 				$label,
-				__( 'Your account is not excluded, so your own test will be tracked.', 'bricks-meta-events' ),
+				__( 'Sent to Test Events.', 'bricks-meta-events' ),
+				__( 'Test mode is on, so your form submissions go to Test Events. Your button clicks aren\'t tracked.', 'bricks-meta-events' ),
 				''
 			);
 		}
 
-		$user  = wp_get_current_user();
-		$roles = ! empty( $user->roles ) ? implode( ', ', $user->roles ) : __( 'unknown', 'bricks-meta-events' );
+		if ( Host::is_woo() ) {
+			return self::row(
+				'current_user',
+				self::WARNING,
+				$label,
+				__( 'Not tracked.', 'bricks-meta-events' ),
+				__( 'Anyone who can manage WooCommerce is skipped.', 'bricks-meta-events' ),
+				__( 'Turn on test mode, or test in a private window.', 'bricks-meta-events' )
+			);
+		}
 
 		return self::row(
 			'current_user',
 			self::WARNING,
 			$label,
-			sprintf(
-				/* translators: %s: comma-separated role names. */
-				__( 'You are signed in as %s. Meta pixel for WordPress throws away anything sent by people who can edit posts or upload files, so your own test will not reach Meta.', 'bricks-meta-events' ),
-				$roles
-			),
-			__( 'Test in a private window while signed out, or as a Subscriber. This is built into Meta pixel for WordPress and cannot be changed.', 'bricks-meta-events' )
+			__( 'Not tracked.', 'bricks-meta-events' ),
+			__( 'Meta pixel for WordPress ignores anyone who can edit posts or upload files, and this can\'t be changed.', 'bricks-meta-events' ),
+			__( 'Test in a private window while signed out.', 'bricks-meta-events' )
 		);
 	}
 
 	/**
-	 * Flag any role that would have its conversions silently discarded.
+	 * List the roles that count as staff, and flag any that look like customers.
 	 *
 	 * On a membership site this is the difference between tracking paying
 	 * customers and tracking nobody.
+	 *
+	 * @return array<int, array{id: string, status: string, label: string, summary: string, message: string, fix: string}>
 	 */
 	private static function check_roles(): array {
-		$roles = wp_roles()->roles;
-		$hit   = array();
+		$hit = array();
 
-		foreach ( $roles as $slug => $role ) {
+		foreach ( wp_roles()->roles as $slug => $role ) {
 			$caps = isset( $role['capabilities'] ) ? (array) $role['capabilities'] : array();
 
-			if ( ! empty( $caps['edit_posts'] ) || ! empty( $caps['upload_files'] ) ) {
+			if ( Host::role_is_staff( $caps ) ) {
 				$hit[] = ! empty( $role['name'] ) ? $role['name'] : $slug;
 			}
 		}
@@ -218,24 +335,28 @@ class Diagnostics {
 		}
 
 		// Roles that are expected to be staff are not worth alarming about.
-		$expected  = array( 'Administrator', 'Editor', 'Author', 'Contributor' );
+		$expected   = Host::is_woo()
+			? array( 'Administrator', 'Shop manager' )
+			: array( 'Administrator', 'Editor', 'Author', 'Contributor' );
 		$unexpected = array_diff( $hit, $expected );
 
 		return array(
 			self::row(
 				'roles',
 				empty( $unexpected ) ? self::INFO : self::WARNING,
-				__( 'People who will not be tracked', 'bricks-meta-events' ),
+				__( 'Excluded roles', 'bricks-meta-events' ),
+				'',
 				sprintf(
-					/* translators: %s: comma-separated role names. */
-					__( 'Anyone with these roles can edit posts or upload files, so nothing they do is tracked: %s.', 'bricks-meta-events' ),
-					implode( ', ', $hit )
+					/* translators: 1: comma-separated role names, 2: who counts as staff, e.g. "can manage WooCommerce". */
+					__( '%1$s. Anyone who %2$s is skipped.', 'bricks-meta-events' ),
+					implode( ', ', $hit ),
+					Host::staff_rule()
 				),
 				empty( $unexpected )
 					? ''
 					: sprintf(
 						/* translators: %s: comma-separated role names. */
-						__( 'Check these are staff only: %s. If any of them is a customer or member role, everything those people do is being thrown away.', 'bricks-meta-events' ),
+						__( 'Check these are staff only: %s. If one is a customer or member role, those people aren\'t being tracked.', 'bricks-meta-events' ),
 						implode( ', ', $unexpected )
 					)
 			),
@@ -252,7 +373,7 @@ class Diagnostics {
 	 * fired at the other server and vanish. The visible symptom is a loopback
 	 * timeout, which reads like a firewall problem and is not one.
 	 *
-	 * @return array<int, array{id: string, status: string, label: string, message: string, fix: string}>
+	 * @return array<int, array{id: string, status: string, label: string, summary: string, message: string, fix: string}>
 	 */
 	private static function check_site_url(): array {
 		$siteurl = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST );
@@ -266,14 +387,15 @@ class Diagnostics {
 			self::row(
 				'site_url',
 				self::ERROR,
-				__( 'Site address mismatch', 'bricks-meta-events' ),
+				__( 'Site address', 'bricks-meta-events' ),
+				__( 'Mismatch.', 'bricks-meta-events' ),
 				sprintf(
 					/* translators: 1: WordPress address host, 2: site address host. */
-					__( 'WordPress Address is %1$s but Site Address is %2$s. Conversions are sent to the WordPress Address, so they are going to %1$s instead of this site.', 'bricks-meta-events' ),
+					__( 'WordPress Address is %1$s but Site Address is %2$s, so conversions are sent to %1$s.', 'bricks-meta-events' ),
 					$siteurl,
 					$home
 				),
-				__( 'Normal on a local or staging copy of a live site, where this cannot be tested. On a live site, correct WordPress Address under Settings, General.', 'bricks-meta-events' )
+				__( 'Normal on a local or staging copy. On a live site, correct WordPress Address under Settings, General.', 'bricks-meta-events' )
 			),
 		);
 	}
@@ -282,25 +404,24 @@ class Diagnostics {
 	 * Is a pixel ID configured at all?
 	 */
 	private static function check_pixel_id(): array {
-		$pixel_id = Host_Adapter::pixel_id();
+		$pixel_id = Host::pixel_id();
 
 		if ( '' === $pixel_id ) {
 			return self::row(
 				'pixel_id',
 				self::ERROR,
 				__( 'Pixel ID', 'bricks-meta-events' ),
-				__( 'No pixel is set up, so nothing can be tracked.', 'bricks-meta-events' ),
-				__( 'Add your pixel under Settings, Meta.', 'bricks-meta-events' )
+				__( 'Missing.', 'bricks-meta-events' ),
+				__( 'Nothing can be tracked.', 'bricks-meta-events' ),
+				sprintf(
+					/* translators: %s: admin menu location. */
+					__( 'Add your pixel under %s.', 'bricks-meta-events' ),
+					Host::settings_location()
+				)
 			);
 		}
 
-		return self::row(
-			'pixel_id',
-			self::OK,
-			__( 'Pixel ID', 'bricks-meta-events' ),
-			$pixel_id,
-			''
-		);
+		return self::row( 'pixel_id', self::OK, __( 'Pixel ID', 'bricks-meta-events' ), '', $pixel_id, '' );
 	}
 
 	/**
@@ -311,53 +432,65 @@ class Diagnostics {
 	 * redirect resilience that is most of the point.
 	 */
 	private static function check_access_token(): array {
-		$label = __( 'Sending from your site', 'bricks-meta-events' );
+		$label = __( 'Connection', 'bricks-meta-events' );
 
 		if ( ! Host_Adapter::has_access_token() ) {
 			return self::row(
 				'access_token',
 				self::WARNING,
 				$label,
-				__( 'Not set up. Everything will be sent from the visitor\'s browser instead, where ad blockers and page redirects can lose it.', 'bricks-meta-events' ),
+				__( 'Not connected.', 'bricks-meta-events' ),
+				__( 'Conversions are sent from the visitor\'s browser only, where ad blockers can lose them.', 'bricks-meta-events' ),
 				__( 'Connect the Conversions API under Settings, Meta.', 'bricks-meta-events' )
 			);
 		}
 
-		return self::row( 'access_token', self::OK, $label, __( 'Set up.', 'bricks-meta-events' ), '' );
+		return self::row( 'access_token', self::OK, $label, __( 'Connected.', 'bricks-meta-events' ), '', '' );
 	}
 
 	/**
 	 * Has the host plugin tripped its own circuit breaker?
 	 */
 	private static function check_circuit_breaker(): array {
-		$label = __( 'Sending paused', 'bricks-meta-events' );
+		$label = __( 'Sending', 'bricks-meta-events' );
 
 		if ( Host_Adapter::circuit_breaker_ok() ) {
-			return self::row( 'circuit_breaker', self::OK, $label, __( 'No, sending is working normally.', 'bricks-meta-events' ), '' );
+			return self::row( 'circuit_breaker', self::OK, $label, __( 'Working.', 'bricks-meta-events' ), '', '' );
 		}
 
 		return self::row(
 			'circuit_breaker',
 			self::ERROR,
 			$label,
-			__( 'Yes. Meta pixel for WordPress stopped sending after repeated failures and will not try again until it resets.', 'bricks-meta-events' ),
-			__( 'Use Send a test event below to see what Meta is reporting.', 'bricks-meta-events' )
+			__( 'Paused.', 'bricks-meta-events' ),
+			__( 'Meta pixel for WordPress stopped after repeated failures and waits until it resets.', 'bricks-meta-events' ),
+			__( 'Send a test event under Testing to see Meta\'s reply.', 'bricks-meta-events' )
 		);
 	}
 
 	/**
 	 * Surface any structural probe failure against the host plugin.
+	 *
+	 * The probes check that the parts of the host plugin this one calls are
+	 * still there and shaped as expected. They cannot tell whether anything
+	 * is up to date, so the OK wording must not claim that.
 	 */
 	private static function check_probes(): array {
-		$failing = Host_Adapter::failing_probes();
+		$failing = Host::is_woo() ? Woo_Adapter::failing_probes() : Host_Adapter::failing_probes();
+		$label   = __( 'Compatibility', 'bricks-meta-events' );
 
 		if ( empty( $failing ) ) {
 			return array(
 				self::row(
 					'probes',
 					self::OK,
-					__( 'Meta plugin compatibility', 'bricks-meta-events' ),
-					__( 'Everything this plugin relies on is present and unchanged.', 'bricks-meta-events' ),
+					$label,
+					__( 'OK.', 'bricks-meta-events' ),
+					sprintf(
+						/* translators: %s: host plugin name. */
+						__( 'Everything this plugin uses in %s is there.', 'bricks-meta-events' ),
+						Host::name()
+					),
 					''
 				),
 			);
@@ -367,13 +500,19 @@ class Diagnostics {
 			self::row(
 				'probes',
 				self::ERROR,
-				__( 'Meta plugin compatibility', 'bricks-meta-events' ),
+				$label,
+				__( 'Changed.', 'bricks-meta-events' ),
 				sprintf(
-					/* translators: %s: comma-separated probe names. */
-					__( 'Meta pixel for WordPress has changed in a way this plugin does not recognise: %s.', 'bricks-meta-events' ),
+					/* translators: 1: host plugin name, 2: list of missing parts. */
+					__( '%1$s has changed and these parts are missing: %2$s. Sending from your site is off.', 'bricks-meta-events' ),
+					Host::name(),
 					implode( '; ', $failing )
 				),
-				__( 'Sending from your site is switched off until this is sorted. Roll Meta pixel for WordPress back to a version that worked, or update this plugin.', 'bricks-meta-events' )
+				sprintf(
+					/* translators: %s: host plugin name. */
+					__( 'Roll %s back to a version that worked, or update this plugin.', 'bricks-meta-events' ),
+					Host::name()
+				)
 			),
 		);
 	}
@@ -382,29 +521,29 @@ class Diagnostics {
 	 * Informational version row, for support.
 	 */
 	private static function check_versions(): array {
-		$host       = Host_Adapter::host_version();
-		$bricks     = defined( 'BRICKS_VERSION' ) ? BRICKS_VERSION : __( 'not detected', 'bricks-meta-events' );
-		$connection = Host_Adapter::connection_type();
-
-		$labels = array(
-			'fbl4b' => __( 'Facebook Login for Business', 'bricks-meta-events' ),
-			'mbe'   => __( 'Facebook Business Extension', 'bricks-meta-events' ),
+		$host   = Host::version();
+		$bricks = defined( 'BRICKS_VERSION' ) ? BRICKS_VERSION : __( 'not detected', 'bricks-meta-events' );
+		$parts  = array(
+			'Bricks Meta Events ' . VERSION,
+			Host::name() . ' ' . ( '' !== $host ? $host : __( 'unknown', 'bricks-meta-events' ) ),
+			'Bricks ' . $bricks,
 		);
 
-		return self::row(
-			'versions',
-			self::INFO,
-			__( 'Versions', 'bricks-meta-events' ),
-			sprintf(
-				/* translators: 1: this plugin's version, 2: host plugin version, 3: Bricks version, 4: connection type. */
-				__( 'Bricks Meta Events %1$s · Meta pixel for WordPress %2$s · Bricks %3$s · Connected via %4$s', 'bricks-meta-events' ),
-				VERSION,
-				'' !== $host ? $host : __( 'unknown', 'bricks-meta-events' ),
-				$bricks,
-				$labels[ $connection ] ?? ( '' !== $connection ? $connection : __( 'manual configuration', 'bricks-meta-events' ) )
-			),
-			''
-		);
+		if ( Host::PIXEL === Host::current() ) {
+			$connection = Host_Adapter::connection_type();
+			$labels     = array(
+				'fbl4b' => __( 'Facebook Login for Business', 'bricks-meta-events' ),
+				'mbe'   => __( 'Facebook Business Extension', 'bricks-meta-events' ),
+			);
+
+			$parts[] = sprintf(
+				/* translators: %s: how Meta pixel for WordPress is connected. */
+				__( 'Connected via %s', 'bricks-meta-events' ),
+				$labels[ $connection ] ?? ( '' !== $connection ? $connection : __( 'manual setup', 'bricks-meta-events' ) )
+			);
+		}
+
+		return self::row( 'versions', self::INFO, __( 'Versions', 'bricks-meta-events' ), '', implode( ' · ', $parts ), '' );
 	}
 
 	/**
@@ -447,7 +586,7 @@ class Diagnostics {
 				'status'  => self::ERROR,
 				'message' => sprintf(
 					/* translators: 1: target URL, 2: error message. */
-					__( 'Could not reach %1$s: %2$s. Conversions are normally sent through this address in the background, so they would be lost.', 'bricks-meta-events' ),
+					__( 'Failed. Couldn\'t reach %1$s: %2$s', 'bricks-meta-events' ),
 					$target,
 					$response->get_error_message()
 				),
@@ -457,7 +596,7 @@ class Diagnostics {
 				'status'  => self::OK,
 				'message' => sprintf(
 					/* translators: %s: target URL. */
-					__( 'Reached %s. Background sending is not being blocked.', 'bricks-meta-events' ),
+					__( 'Working. Reached %s.', 'bricks-meta-events' ),
 					$target
 				),
 			);
@@ -505,13 +644,21 @@ class Diagnostics {
 	/**
 	 * Build a single check row.
 	 *
-	 * @return array{id: string, status: string, label: string, message: string, fix: string}
+	 * @param string $id      Stable row key.
+	 * @param string $status  One of the status constants.
+	 * @param string $label   Row name.
+	 * @param string $summary Short status shown first in bold, e.g. "Connected.". May be empty.
+	 * @param string $message At most one sentence of context.
+	 * @param string $fix     What to do about it, or empty.
+	 *
+	 * @return array{id: string, status: string, label: string, summary: string, message: string, fix: string}
 	 */
-	private static function row( string $id, string $status, string $label, string $message, string $fix ): array {
+	private static function row( string $id, string $status, string $label, string $summary, string $message, string $fix ): array {
 		return array(
 			'id'      => $id,
 			'status'  => $status,
 			'label'   => $label,
+			'summary' => $summary,
 			'message' => $message,
 			'fix'     => $fix,
 		);

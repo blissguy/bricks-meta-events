@@ -150,11 +150,18 @@ class Form_Tracker {
 			return $response;
 		}
 
-		// The host plugin discards these on its own side. Deciding once, here,
-		// keeps the browser echo consistent with the server rather than
-		// letting one fire without the other.
-		if ( Host_Adapter::is_internal_user() ) {
-			return $response;
+		// The host plugin discards these on its own side, or on Meta for
+		// WooCommerce we do. Deciding once, here, keeps the browser echo
+		// consistent with the server rather than letting one fire without the
+		// other.
+		$staff_test = false;
+
+		if ( Host::is_internal_user() ) {
+			if ( ! Host::staff_can_test() ) {
+				return $response;
+			}
+
+			$staff_test = true;
 		}
 
 		if ( Settings::current_user_excluded() ) {
@@ -172,25 +179,92 @@ class Form_Tracker {
 		$mapper   = new Field_Mapper( $form );
 		$identity = $mapper->identity();
 		$label    = Label_Resolver::resolve( $form );
-		$mode     = self::resolve_mode( $settings, $response );
+		$mode     = $staff_test ? self::MODE_SERVER : self::resolve_mode( $settings, $response );
 
 		foreach ( $mapper->notes() as $note ) {
 			self::log( 'Form ' . $form->get_id() . ': ' . $note );
 		}
 
 		$custom = self::custom_data( $settings, $label );
-		$event  = self::build_event( $event_name, array_merge( $identity, $custom ), $form );
 
-		if ( null !== $event && self::MODE_BROWSER !== $mode ) {
-			self::dispatch( $event );
-			self::$sent[ (string) $form->get_id() ] = $event;
+		if ( Host::is_woo() ) {
+			$event_id = wp_generate_uuid4();
+
+			if ( self::MODE_BROWSER !== $mode && Host::capi_available() ) {
+				self::send_via_woo( $event_name, $event_id, $identity, $custom, $form );
+			}
+		} else {
+			$event    = self::build_event( $event_name, array_merge( $identity, $custom ), $form );
+			$event_id = is_object( $event ) && method_exists( $event, 'getEventId' )
+				? (string) $event->getEventId()
+				: wp_generate_uuid4();
+
+			if ( null !== $event && self::MODE_BROWSER !== $mode ) {
+				self::dispatch( $event );
+				self::$sent[ (string) $form->get_id() ] = $event;
+			}
 		}
 
 		if ( self::MODE_SERVER !== $mode ) {
-			$response['bme_event'] = self::browser_payload( $event, $event_name, $custom );
+			$response['bme_event'] = self::browser_payload( $event_id, $event_name, $custom );
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Send the server half through Meta for WooCommerce.
+	 *
+	 * It waits for Meta's reply, so unlike the Meta pixel for WordPress route
+	 * there is nothing handed off to confirm later: the log gets the answer.
+	 *
+	 * @param string $event_name Meta event name.
+	 * @param string $event_id   Shared with the browser half.
+	 * @param array  $identity   Identity from Field_Mapper.
+	 * @param array  $custom     Custom data shared with the browser half.
+	 * @param object $form       Bricks form object.
+	 */
+	private static function send_via_woo( string $event_name, string $event_id, array $identity, array $custom, $form ): void {
+		$source = self::referrer();
+
+		if ( '' === $source ) {
+			self::log( 'No usable referrer on form ' . $form->get_id() . '; event source URL fell back to the site root.' );
+			$source = home_url( '/' );
+		}
+
+		$custom_data = array_merge(
+			$custom,
+			array(
+				// A stable machine key alongside the human label.
+				'bricks_form_id'          => self::base_element_id( (string) $form->get_id() ),
+				'fb_integration_tracking' => Plugin::INTEGRATION_NAME,
+			)
+		);
+
+		$result = Woo_Adapter::send(
+			array(
+				'event_name'       => $event_name,
+				'event_id'         => $event_id,
+				'event_source_url' => $source,
+				'custom_data'      => $custom_data,
+				'user_data'        => Woo_Adapter::user_data( $identity ),
+			),
+			self::test_event_code()
+		);
+
+		Event_Log::record(
+			array(
+				'time'     => time(),
+				'event'    => $event_name,
+				'label'    => (string) ( $custom['content_name'] ?? '' ),
+				'event_id' => $event_id,
+				'source'   => $source,
+				'matched'  => $result['matched'],
+				'mode'     => 'inline',
+				'outcome'  => $result['outcome'],
+				'response' => $result['response'],
+			)
+		);
 	}
 
 	/**
@@ -218,20 +292,11 @@ class Form_Tracker {
 			return self::MODE_SERVER;
 		}
 
-		if ( ! self::capi_available() ) {
+		if ( ! Host::capi_available() ) {
 			return self::MODE_BROWSER;
 		}
 
 		return self::MODE_BOTH;
-	}
-
-	/**
-	 * Whether a Conversions API send could actually succeed right now.
-	 */
-	private static function capi_available(): bool {
-		return Host_Adapter::can_send_server_events()
-			&& Host_Adapter::has_access_token()
-			&& Host_Adapter::circuit_breaker_ok();
 	}
 
 	/**
@@ -306,17 +371,13 @@ class Form_Tracker {
 	 * disagree with what was sent server-side: divergent names would produce
 	 * two conversions rather than one deduplicated pair.
 	 *
-	 * @param object|null $event      Event object, when one was built.
-	 * @param string      $event_name Meta event name.
-	 * @param array       $custom     Custom data shared with the server event.
+	 * @param string $event_id   Shared with the server event.
+	 * @param string $event_name Meta event name.
+	 * @param array  $custom     Custom data shared with the server event.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private static function browser_payload( $event, string $event_name, array $custom ): array {
-		$event_id = is_object( $event ) && method_exists( $event, 'getEventId' )
-			? (string) $event->getEventId()
-			: wp_generate_uuid4();
-
+	private static function browser_payload( string $event_id, string $event_name, array $custom ): array {
 		return array(
 			'name'     => $event_name,
 			'event_id' => $event_id,
@@ -493,13 +554,43 @@ class Form_Tracker {
 	}
 
 	/**
-	 * The Events Manager test code, when one is set for this site.
+	 * The Events Manager test code, while test mode is on.
 	 *
-	 * Set only while checking a setup. Everything sent while it is filled in
-	 * goes to Test Events instead of the real figures.
+	 * Empty when test mode is off, even if a code is saved. Everything sent
+	 * while this returns a code goes to Test Events instead of the real
+	 * figures, so every caller that decides where a conversion goes reads
+	 * this, never the saved code directly.
 	 */
 	public static function test_event_code(): string {
+		return self::test_mode_on() ? self::saved_test_code() : '';
+	}
+
+	/**
+	 * The saved test code, whether or not test mode is on.
+	 *
+	 * Kept when test mode is switched off, so turning it back on does not
+	 * mean another trip to Events Manager to copy the same code.
+	 */
+	public static function saved_test_code(): string {
 		return trim( (string) get_option( Plugin::OPTION_TEST_CODE, '' ) );
+	}
+
+	/**
+	 * Whether test mode is switched on and has a code to send with.
+	 *
+	 * Before 0.9.0 there was no switch: a saved code was test mode. A site
+	 * upgrading with a code saved and no switch stored yet therefore stays in
+	 * test mode until someone turns it off, rather than silently starting to
+	 * count its test submissions as real.
+	 */
+	public static function test_mode_on(): bool {
+		$switch = get_option( Plugin::OPTION_TEST_MODE, null );
+
+		if ( null === $switch ) {
+			return '' !== self::saved_test_code();
+		}
+
+		return '1' === (string) $switch && '' !== self::saved_test_code();
 	}
 
 	/**
